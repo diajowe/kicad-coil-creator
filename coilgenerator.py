@@ -21,145 +21,299 @@ from lib import generator
 
 """  ~~~  ENTER PARAMETERS BELOW  ~~~  """
 NAME = "COIL_GENERATOR_1"  # Name of footprint
-DUAL_LAYER = True  # Determines if bottom layer should be used or not
+LAYER_COUNT = 4  # Currently supported: 1, 2, 4
 WRAP_CLOCKWISE = True  # Wraps CCW if false
 N_TURNS = 23  # Must be an int
 TRACE_WIDTH = 0.09  # (mm)
 TRACE_SPACING = 0.09  # (mm)
-VIA_DIAMETER = 0.7  # (mm)
+VIA_DIAMETER = 0.5  # (mm)
 VIA_DRILL = 0.3  # (mm)
 OUTER_DIAMETER = 12  # (mm)
 BREAKOUT_LEN = 0.5  # (mm) scalar used to affect location of the breakouts
 TEMPLATE_FILE = "template.kicad_mod"
-TOP_LAYER = "F.Cu"
-BOTTOM_LAYER = "B.Cu"
+LAYER_TOP = "F.Cu"
+LAYER_BOTTOM = "B.Cu"
+LAYER_INNER = ["In1.Cu", "In2.Cu"]
 
 if __name__ == '__main__':
-    with open("ref/" + TEMPLATE_FILE, 'r') as file:
-        template = file.read()
+	with open("ref/" + TEMPLATE_FILE, 'r') as file:
+		template = file.read()
 
-    arcs = []
-    vias = []
-    lines = []
-    pads = []
+	arcs = []
+	vias = []
+	lines = []
+	pads = []
 
-    inner_radius = OUTER_DIAMETER / 2 - N_TURNS * TRACE_WIDTH - (N_TURNS - 1) * TRACE_SPACING
+	current_radius = OUTER_DIAMETER / 2 - N_TURNS * TRACE_WIDTH - (N_TURNS - 1) * TRACE_SPACING
 
-    # place center via where it belongs
-    vias.append(
-        generator.via(
-            generator.P2D(inner_radius - (VIA_DIAMETER - TRACE_WIDTH) / 2, 0),
-            VIA_DIAMETER,
-            VIA_DRILL)
-    )
+	# place center via where it belongs
+	vias.append(
+		generator.via(
+			generator.P2D(current_radius - VIA_DIAMETER - TRACE_WIDTH / 2, 0),
+			VIA_DIAMETER,
+			VIA_DRILL)
+	)
 
-    # build out arcs to spec, until # turns is reached
-    wrap_multiplier = 1 if WRAP_CLOCKWISE else -1
-    increment = TRACE_WIDTH + TRACE_SPACING
+	if LAYER_COUNT > 2:
+		vias.append(generator.via(
+			generator.P2D(-current_radius + VIA_DIAMETER + TRACE_WIDTH / 2, 0),
+			VIA_DIAMETER,
+			VIA_DRILL
+		))
+		vias.append(generator.via(
+			generator.P2D(OUTER_DIAMETER / 2 + VIA_DIAMETER + TRACE_SPACING, 0),
+			VIA_DIAMETER,
+			VIA_DRILL
+		))
 
-    for arc in range(N_TURNS):
-        loop = generator.loop(inner_radius, increment, TRACE_WIDTH, TOP_LAYER, wrap_multiplier)
-        arcs.extend(loop)
-        if DUAL_LAYER:
-            loop = generator.loop(inner_radius, increment, TRACE_WIDTH, BOTTOM_LAYER, -wrap_multiplier)
-            arcs.extend(loop)
-        inner_radius += increment
 
-    # draw breakout line(s)
-    lines.append(
-        generator.line(
-            generator.P2D(inner_radius, 0),
-            generator.P2D(inner_radius + BREAKOUT_LEN, BREAKOUT_LEN * -wrap_multiplier),
-            TRACE_WIDTH,
-            TOP_LAYER
-        )
-    )
-    lines.append(
-        generator.line(
-            generator.P2D(inner_radius + BREAKOUT_LEN, BREAKOUT_LEN * -wrap_multiplier),
-            generator.P2D(inner_radius + 3 * BREAKOUT_LEN, BREAKOUT_LEN * -wrap_multiplier),
-            TRACE_WIDTH,
-            TOP_LAYER
-        )
-    )
+	# build out arcs to spec, until # turns is reached
+	wrap_multiplier = 1 if WRAP_CLOCKWISE else -1
+	increment = TRACE_WIDTH + TRACE_SPACING
 
-    if DUAL_LAYER:
-        lines.append(
-            generator.line(
-                generator.P2D(inner_radius, 0),
-                generator.P2D(inner_radius + BREAKOUT_LEN, BREAKOUT_LEN * wrap_multiplier),
-                TRACE_WIDTH,
-                BOTTOM_LAYER
-            )
-        )
-        lines.append(
-            generator.line(
-                generator.P2D(inner_radius + BREAKOUT_LEN, BREAKOUT_LEN * wrap_multiplier),
-                generator.P2D(inner_radius + 2 * BREAKOUT_LEN, BREAKOUT_LEN * wrap_multiplier),
-                TRACE_WIDTH,
-                BOTTOM_LAYER
-            )
-        )
-        # draw outer via
-        vias.append(
-            generator.via(
-                generator.P2D(inner_radius + 2 * BREAKOUT_LEN, BREAKOUT_LEN * wrap_multiplier),
-                VIA_DIAMETER,
-                VIA_DRILL
-            )
-        )
+	for arc in range(N_TURNS):
+		if arc == 0:
+			# Front Layer
+			arcs.extend(generator.arc(
+				generator.P2D(current_radius - VIA_DIAMETER, 0),
+				generator.P2D(-VIA_DIAMETER, -wrap_multiplier * (current_radius - VIA_DIAMETER / 2)),
+				generator.P2D(-current_radius, 0),
+				TRACE_WIDTH,
+				LAYER_TOP,
+				bool(wrap_multiplier + 1)
+			))
+			arcs.extend(generator.arc(
+				generator.P2D(-current_radius, 0),
+				generator.P2D(-increment / 2, wrap_multiplier * (current_radius + increment / 2)),
+				generator.P2D(current_radius + increment, 0),
+				TRACE_WIDTH,
+				LAYER_TOP,
+				bool(wrap_multiplier + 1)
+			))
 
-        # draw last line to pad
-        lines.append(
-            generator.line(
-                generator.P2D(inner_radius + 2 * BREAKOUT_LEN, BREAKOUT_LEN * wrap_multiplier),
-                generator.P2D(inner_radius + 3 * BREAKOUT_LEN, BREAKOUT_LEN * wrap_multiplier),
-                TRACE_WIDTH,
-                TOP_LAYER
-            )
-        )
+			if LAYER_COUNT > 1:
+				layer = LAYER_BOTTOM # top to bottom if 2 layers
 
-    # connect to pads
+				if LAYER_COUNT > 2:
+					layer = LAYER_INNER[0] # top to inner1 if more than two layers
 
-    # NOTE: there are some oddities in KiCAD here. The pad must be sufficiently far away from the last line such that
-    # KiCAD does not display the "Cannot start routing from a graphic" error. It also must be far enough away that the
-    # trace does not throw the "The routing start point violates DRC error". I have found that a 0.5mm gap works ok in
-    # most scenarios, with a 1.2mm wide pad. Feel free to adjust to your needs, but you've been warned.
-    pads.append(
-        generator.pad(
-            1,
-            generator.P2D(inner_radius + 3 * BREAKOUT_LEN + 0.5, BREAKOUT_LEN * -wrap_multiplier),
-            1.2,
-            TRACE_WIDTH,
-            TOP_LAYER
-        )
-    )
+				arcs.extend(generator.arc(
+					generator.P2D(current_radius - VIA_DIAMETER, 0),
+					generator.P2D(-VIA_DIAMETER, wrap_multiplier * (current_radius - VIA_DIAMETER / 2)),
+					generator.P2D(-current_radius, 0),
+					TRACE_WIDTH,
+					layer,
+					not bool(wrap_multiplier + 1)
+				))
+				arcs.extend(generator.arc(
+					generator.P2D(-current_radius, 0),
+					generator.P2D(-increment / 2, -wrap_multiplier * (current_radius + increment / 2)),
+					generator.P2D(current_radius + increment, 0),
+					TRACE_WIDTH,
+					layer,
+					not bool(wrap_multiplier + 1)
+				))
 
-    if DUAL_LAYER:
-        pads.append(
-            generator.pad(
-                2,
-                generator.P2D(inner_radius + 3 * BREAKOUT_LEN + 0.5, BREAKOUT_LEN * wrap_multiplier),
-                1.2,
-                TRACE_WIDTH,
-                TOP_LAYER
-            )
-        )
+			if LAYER_COUNT > 2:
+				arcs.extend(generator.loop(
+					current_radius,
+					increment,
+					TRACE_WIDTH,
+					LAYER_INNER[1],
+					wrap_multiplier
+				))
+				arcs.extend(generator.arc(
+					generator.P2D(current_radius, 0),
+					generator.P2D(VIA_DIAMETER, wrap_multiplier * (current_radius - VIA_DIAMETER / 2)),
+					generator.P2D(-current_radius + VIA_DIAMETER, 0),
+					TRACE_WIDTH,
+					LAYER_INNER[1],
+					not bool(wrap_multiplier + 1)
+				))
 
-    substitution_dict = {
-        "NAME": NAME,
-        "LINES": ''.join(lines),
-        "ARCS": ''.join(arcs),
-        "VIAS": ''.join(vias),
-        "PADS": ''.join(pads),
-        "TIMESTAMP1": generator.tstamp(),
-        "TIMESTAMP2": generator.tstamp(),
-        "TIMESTAMP3": generator.tstamp(),
-    }
+				arcs.extend(generator.loop(
+					current_radius,
+					increment,
+					TRACE_WIDTH,
+					LAYER_BOTTOM,
+					-wrap_multiplier
+				))
+				arcs.extend(generator.arc(
+					generator.P2D(current_radius, 0),
+					generator.P2D(VIA_DIAMETER, -wrap_multiplier * (current_radius - VIA_DIAMETER / 2)),
+					generator.P2D(-current_radius + VIA_DIAMETER, 0),
+					TRACE_WIDTH,
+					LAYER_BOTTOM,
+					bool(wrap_multiplier + 1)
+				))
 
-    template = template.format(**substitution_dict)
+		elif arc == N_TURNS - 1 and LAYER_COUNT > 2:
+			# inner layer 0 extended lines
+			arcs.extend(generator.arc(
+				generator.P2D(OUTER_DIAMETER / 2 + VIA_DIAMETER + TRACE_SPACING, 0),
+				generator.P2D(VIA_DIAMETER + TRACE_SPACING, -wrap_multiplier * (OUTER_DIAMETER / 2 + (VIA_DIAMETER + TRACE_SPACING) / 2 - TRACE_WIDTH)),
+				generator.P2D(-(OUTER_DIAMETER - TRACE_WIDTH - TRACE_SPACING) / 2, 0),
+				TRACE_WIDTH,
+				LAYER_INNER[0],
+				bool(wrap_multiplier + 1)
+			))
+			arcs.extend(generator.arc(
+				generator.P2D(-(OUTER_DIAMETER - TRACE_WIDTH - TRACE_SPACING) / 2, 0),
+				generator.P2D(VIA_DIAMETER + TRACE_SPACING, wrap_multiplier * (OUTER_DIAMETER / 2 - (TRACE_WIDTH + TRACE_SPACING) / 2)),
+				generator.P2D((OUTER_DIAMETER - TRACE_WIDTH - TRACE_SPACING) / 2, 0),
+				TRACE_WIDTH,
+				LAYER_INNER[0],
+				bool(wrap_multiplier + 1)
+			))
 
-    with open(f'{NAME}.kicad_mod', 'w') as outfile:
-        outfile.write(template)
-        outfile.close()
+			# inner layer 1 extended lines
+			arcs.extend(generator.arc(
+				generator.P2D(OUTER_DIAMETER / 2 + VIA_DIAMETER + TRACE_SPACING, 0),
+				generator.P2D(VIA_DIAMETER + TRACE_SPACING, wrap_multiplier * (OUTER_DIAMETER / 2 + (VIA_DIAMETER + TRACE_SPACING) / 2)),
+				generator.P2D(-(OUTER_DIAMETER - TRACE_WIDTH - TRACE_SPACING) / 2, 0),
+				TRACE_WIDTH,
+				LAYER_INNER[1],
+				not bool(wrap_multiplier + 1)
+			))
+			arcs.extend(generator.arc(
+				generator.P2D(-(OUTER_DIAMETER - TRACE_WIDTH - TRACE_SPACING) / 2, 0),
+				generator.P2D(VIA_DIAMETER + TRACE_SPACING, -wrap_multiplier * (OUTER_DIAMETER / 2 - (TRACE_WIDTH + TRACE_SPACING) / 2)),
+				generator.P2D((OUTER_DIAMETER - TRACE_WIDTH - TRACE_SPACING) / 2, 0),
+				TRACE_WIDTH,
+				LAYER_INNER[1],
+				not bool(wrap_multiplier + 1)
+			))
+
+			# add back top/bottom layers
+			arcs.extend(generator.loop(
+				current_radius,
+				increment,
+				TRACE_WIDTH,
+				LAYER_TOP,
+				wrap_multiplier
+			))
+
+			arcs.extend(generator.loop(
+				current_radius,
+				increment,
+				TRACE_WIDTH,
+				LAYER_BOTTOM,
+				-wrap_multiplier
+			))
+		else:
+			arcs.extend(generator.loop(
+				current_radius,
+				increment,
+				TRACE_WIDTH,
+				LAYER_TOP,
+				wrap_multiplier
+			))
+
+			if LAYER_COUNT > 1:
+				arcs.extend(generator.loop(
+					current_radius,
+					increment,
+					TRACE_WIDTH,
+					LAYER_BOTTOM,
+					-wrap_multiplier
+				))
+
+			if LAYER_COUNT > 2:
+				arcs.extend(generator.loop(
+					current_radius,
+					increment,
+					TRACE_WIDTH,
+					LAYER_INNER[0],
+					-wrap_multiplier
+				))
+
+				arcs.extend(generator.loop(
+					current_radius,
+					increment,
+					TRACE_WIDTH,
+					LAYER_INNER[1],
+					wrap_multiplier
+				))
+
+		current_radius += increment
+
+	# draw breakout line(s)
+	lines.append(
+		generator.line(
+			generator.P2D(current_radius, 0),
+			generator.P2D(current_radius, BREAKOUT_LEN * -wrap_multiplier),
+			TRACE_WIDTH,
+			LAYER_TOP
+		)
+	)
+	lines.append(
+		generator.line(
+			generator.P2D(current_radius, BREAKOUT_LEN * -wrap_multiplier),
+			generator.P2D(current_radius + BREAKOUT_LEN, BREAKOUT_LEN * -wrap_multiplier),
+			TRACE_WIDTH,
+			LAYER_TOP
+		)
+	)
+
+	if LAYER_COUNT > 1:
+		lines.append(
+			generator.line(
+				generator.P2D(current_radius, 0),
+				generator.P2D(current_radius, BREAKOUT_LEN * wrap_multiplier),
+				TRACE_WIDTH,
+				LAYER_BOTTOM
+			)
+		)
+		lines.append(
+			generator.line(
+				generator.P2D(current_radius, BREAKOUT_LEN * wrap_multiplier),
+				generator.P2D(current_radius + BREAKOUT_LEN, BREAKOUT_LEN * wrap_multiplier),
+				TRACE_WIDTH,
+				LAYER_BOTTOM
+			)
+		)
+
+	# connect to pads
+
+	# NOTE: there are some oddities in KiCAD here. The pad must be sufficiently far away from the last line such that
+	# KiCAD does not display the "Cannot start routing from a graphic" error. It also must be far enough away that the
+	# trace does not throw the "The routing start point violates DRC error". I have found that a 0.5mm gap works ok in
+	# most scenarios, with a 1.2mm wide pad. Feel free to adjust to your needs, but you've been warned.
+	pads.append(
+		generator.pad(
+			1,
+			generator.P2D(current_radius + 1.7 * BREAKOUT_LEN, BREAKOUT_LEN * -wrap_multiplier),
+			8 * TRACE_WIDTH,
+			TRACE_WIDTH,
+			LAYER_TOP
+		)
+	)
+
+	if LAYER_COUNT > 1:
+		pads.append(
+			generator.pad(
+				2,
+				generator.P2D(current_radius + 1.7 * BREAKOUT_LEN, BREAKOUT_LEN * wrap_multiplier),
+				8 * TRACE_WIDTH,
+				TRACE_WIDTH,
+				LAYER_BOTTOM
+			)
+		)
+
+	substitution_dict = {
+		"NAME": NAME,
+		"LINES": ''.join(lines),
+		"ARCS": ''.join(arcs),
+		"VIAS": ''.join(vias),
+		"PADS": ''.join(pads),
+		"TIMESTAMP1": generator.tstamp(),
+		"TIMESTAMP2": generator.tstamp(),
+		"TIMESTAMP3": generator.tstamp(),
+	}
+
+	template = template.format(**substitution_dict)
+
+	with open(f'{NAME}.kicad_mod', 'w') as outfile:
+		outfile.write(template)
+		outfile.close()
 
