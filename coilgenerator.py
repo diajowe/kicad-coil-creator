@@ -23,19 +23,19 @@ from lib import generator
 NAME = "COIL_GENERATOR_1"  # Name of footprint
 DUAL_LAYER = True  # Determines if bottom layer should be used or not
 WRAP_CLOCKWISE = True  # Wraps CCW if false
-N_TURNS = 10  # Must be an int
-TRACE_WIDTH = 0.15  # (mm)
-TRACE_SPACING = 0.15  # (mm)
+N_TURNS = 23  # Must be an int
+TRACE_WIDTH = 0.09  # (mm)
+TRACE_SPACING = 0.09  # (mm)
 VIA_DIAMETER = 0.7  # (mm)
 VIA_DRILL = 0.3  # (mm)
-VIA_OFFSET = 2.8  # (mm)
+OUTER_DIAMETER = 12  # (mm)
 BREAKOUT_LEN = 0.5  # (mm) scalar used to affect location of the breakouts
 TEMPLATE_FILE = "template.kicad_mod"
 TOP_LAYER = "F.Cu"
 BOTTOM_LAYER = "B.Cu"
 
 if __name__ == '__main__':
-    with open(TEMPLATE_FILE, 'r') as file:
+    with open("ref/" + TEMPLATE_FILE, 'r') as file:
         template = file.read()
 
     arcs = []
@@ -43,40 +43,41 @@ if __name__ == '__main__':
     lines = []
     pads = []
 
+    inner_radius = OUTER_DIAMETER / 2 - N_TURNS * TRACE_WIDTH - (N_TURNS - 1) * TRACE_SPACING
+
     # place center via where it belongs
     vias.append(
         generator.via(
-            P2D(VIA_DIAMETER/2 + VIA_OFFSET, 0),
+            generator.P2D(inner_radius - (VIA_DIAMETER - TRACE_WIDTH) / 2, 0),
             VIA_DIAMETER,
             VIA_DRILL)
     )
 
     # build out arcs to spec, until # turns is reached
     wrap_multiplier = 1 if WRAP_CLOCKWISE else -1
-    radius = VIA_OFFSET + VIA_DIAMETER - TRACE_WIDTH/2
     increment = TRACE_WIDTH + TRACE_SPACING
 
     for arc in range(N_TURNS):
-        loop = generator.loop(radius, increment, TRACE_WIDTH, TOP_LAYER, wrap_multiplier)
+        loop = generator.loop(inner_radius, increment, TRACE_WIDTH, TOP_LAYER, wrap_multiplier)
         arcs.extend(loop)
         if DUAL_LAYER:
-            loop = generator.loop(radius, increment, TRACE_WIDTH, BOTTOM_LAYER, -wrap_multiplier)
+            loop = generator.loop(inner_radius, increment, TRACE_WIDTH, BOTTOM_LAYER, -wrap_multiplier)
             arcs.extend(loop)
-        radius += increment
+        inner_radius += increment
 
     # draw breakout line(s)
     lines.append(
         generator.line(
-            generator.P2D(radius, 0),
-            generator.P2D(radius + BREAKOUT_LEN, BREAKOUT_LEN * -wrap_multiplier),
+            generator.P2D(inner_radius, 0),
+            generator.P2D(inner_radius + BREAKOUT_LEN, BREAKOUT_LEN * -wrap_multiplier),
             TRACE_WIDTH,
             TOP_LAYER
         )
     )
     lines.append(
         generator.line(
-            generator.P2D(radius + BREAKOUT_LEN, BREAKOUT_LEN * -wrap_multiplier),
-            generator.P2D(radius + 3 * BREAKOUT_LEN, BREAKOUT_LEN * -wrap_multiplier),
+            generator.P2D(inner_radius + BREAKOUT_LEN, BREAKOUT_LEN * -wrap_multiplier),
+            generator.P2D(inner_radius + 3 * BREAKOUT_LEN, BREAKOUT_LEN * -wrap_multiplier),
             TRACE_WIDTH,
             TOP_LAYER
         )
@@ -85,16 +86,16 @@ if __name__ == '__main__':
     if DUAL_LAYER:
         lines.append(
             generator.line(
-                generator.P2D(radius, 0),
-                generator.P2D(radius + BREAKOUT_LEN, BREAKOUT_LEN * wrap_multiplier),
+                generator.P2D(inner_radius, 0),
+                generator.P2D(inner_radius + BREAKOUT_LEN, BREAKOUT_LEN * wrap_multiplier),
                 TRACE_WIDTH,
                 BOTTOM_LAYER
             )
         )
         lines.append(
             generator.line(
-                generator.P2D(radius + BREAKOUT_LEN, BREAKOUT_LEN * wrap_multiplier),
-                generator.P2D(radius + 2 * BREAKOUT_LEN, BREAKOUT_LEN * wrap_multiplier),
+                generator.P2D(inner_radius + BREAKOUT_LEN, BREAKOUT_LEN * wrap_multiplier),
+                generator.P2D(inner_radius + 2 * BREAKOUT_LEN, BREAKOUT_LEN * wrap_multiplier),
                 TRACE_WIDTH,
                 BOTTOM_LAYER
             )
@@ -102,7 +103,7 @@ if __name__ == '__main__':
         # draw outer via
         vias.append(
             generator.via(
-                generator.P2D(radius + 2 * BREAKOUT_LEN, BREAKOUT_LEN * wrap_multiplier),
+                generator.P2D(inner_radius + 2 * BREAKOUT_LEN, BREAKOUT_LEN * wrap_multiplier),
                 VIA_DIAMETER,
                 VIA_DRILL
             )
@@ -111,8 +112,8 @@ if __name__ == '__main__':
         # draw last line to pad
         lines.append(
             generator.line(
-                generator.P2D(radius + 2 * BREAKOUT_LEN, BREAKOUT_LEN * wrap_multiplier),
-                generator.P2D(radius + 3 * BREAKOUT_LEN, BREAKOUT_LEN * wrap_multiplier),
+                generator.P2D(inner_radius + 2 * BREAKOUT_LEN, BREAKOUT_LEN * wrap_multiplier),
+                generator.P2D(inner_radius + 3 * BREAKOUT_LEN, BREAKOUT_LEN * wrap_multiplier),
                 TRACE_WIDTH,
                 TOP_LAYER
             )
@@ -127,7 +128,7 @@ if __name__ == '__main__':
     pads.append(
         generator.pad(
             1,
-            generator.P2D(radius + 3 * BREAKOUT_LEN + 0.5, BREAKOUT_LEN * -wrap_multiplier),
+            generator.P2D(inner_radius + 3 * BREAKOUT_LEN + 0.5, BREAKOUT_LEN * -wrap_multiplier),
             1.2,
             TRACE_WIDTH,
             TOP_LAYER
@@ -138,7 +139,7 @@ if __name__ == '__main__':
         pads.append(
             generator.pad(
                 2,
-                generator.P2D(radius + 3 * BREAKOUT_LEN + 0.5, BREAKOUT_LEN * wrap_multiplier),
+                generator.P2D(inner_radius + 3 * BREAKOUT_LEN + 0.5, BREAKOUT_LEN * wrap_multiplier),
                 1.2,
                 TRACE_WIDTH,
                 TOP_LAYER
