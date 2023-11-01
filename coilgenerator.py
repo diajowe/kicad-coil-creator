@@ -1,6 +1,7 @@
 """
 This script is used to generate pcb coils
 Copyright (C) 2022 Colton Baldridge
+Copyright (C) 2023 Tim Goll
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -16,7 +17,7 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
 
-from coilgen import *
+from lib import generator
 
 """  ~~~  ENTER PARAMETERS BELOW  ~~~  """
 NAME = "COIL_GENERATOR_1"  # Name of footprint
@@ -44,7 +45,7 @@ if __name__ == '__main__':
 
     # place center via where it belongs
     vias.append(
-        generate_via(
+        generator.via(
             P2D(VIA_DIAMETER/2 + VIA_OFFSET, 0),
             VIA_DIAMETER,
             VIA_DRILL)
@@ -56,26 +57,26 @@ if __name__ == '__main__':
     increment = TRACE_WIDTH + TRACE_SPACING
 
     for arc in range(N_TURNS):
-        loop = draw_loop(radius, increment, TRACE_WIDTH, TOP_LAYER, wrap_multiplier)
+        loop = generator.loop(radius, increment, TRACE_WIDTH, TOP_LAYER, wrap_multiplier)
         arcs.extend(loop)
         if DUAL_LAYER:
-            loop = draw_loop(radius, increment, TRACE_WIDTH, BOTTOM_LAYER, -wrap_multiplier)
+            loop = generator.loop(radius, increment, TRACE_WIDTH, BOTTOM_LAYER, -wrap_multiplier)
             arcs.extend(loop)
         radius += increment
 
     # draw breakout line(s)
     lines.append(
-        generate_line(
-            P2D(radius, 0),
-            P2D(radius + BREAKOUT_LEN, BREAKOUT_LEN * -wrap_multiplier),
+        generator.line(
+            generator.P2D(radius, 0),
+            generator.P2D(radius + BREAKOUT_LEN, BREAKOUT_LEN * -wrap_multiplier),
             TRACE_WIDTH,
             TOP_LAYER
         )
     )
     lines.append(
-        generate_line(
-            P2D(radius + BREAKOUT_LEN, BREAKOUT_LEN * -wrap_multiplier),
-            P2D(radius + 3 * BREAKOUT_LEN, BREAKOUT_LEN * -wrap_multiplier),
+        generator.line(
+            generator.P2D(radius + BREAKOUT_LEN, BREAKOUT_LEN * -wrap_multiplier),
+            generator.P2D(radius + 3 * BREAKOUT_LEN, BREAKOUT_LEN * -wrap_multiplier),
             TRACE_WIDTH,
             TOP_LAYER
         )
@@ -83,25 +84,25 @@ if __name__ == '__main__':
 
     if DUAL_LAYER:
         lines.append(
-            generate_line(
-                P2D(radius, 0),
-                P2D(radius + BREAKOUT_LEN, BREAKOUT_LEN * wrap_multiplier),
+            generator.line(
+                generator.P2D(radius, 0),
+                generator.P2D(radius + BREAKOUT_LEN, BREAKOUT_LEN * wrap_multiplier),
                 TRACE_WIDTH,
                 BOTTOM_LAYER
             )
         )
         lines.append(
-            generate_line(
-                P2D(radius + BREAKOUT_LEN, BREAKOUT_LEN * wrap_multiplier),
-                P2D(radius + 2 * BREAKOUT_LEN, BREAKOUT_LEN * wrap_multiplier),
+            generator.line(
+                generator.P2D(radius + BREAKOUT_LEN, BREAKOUT_LEN * wrap_multiplier),
+                generator.P2D(radius + 2 * BREAKOUT_LEN, BREAKOUT_LEN * wrap_multiplier),
                 TRACE_WIDTH,
                 BOTTOM_LAYER
             )
         )
         # draw outer via
         vias.append(
-            generate_via(
-                P2D(radius + 2 * BREAKOUT_LEN, BREAKOUT_LEN * wrap_multiplier),
+            generator.via(
+                generator.P2D(radius + 2 * BREAKOUT_LEN, BREAKOUT_LEN * wrap_multiplier),
                 VIA_DIAMETER,
                 VIA_DRILL
             )
@@ -109,9 +110,9 @@ if __name__ == '__main__':
 
         # draw last line to pad
         lines.append(
-            generate_line(
-                P2D(radius + 2 * BREAKOUT_LEN, BREAKOUT_LEN * wrap_multiplier),
-                P2D(radius + 3 * BREAKOUT_LEN, BREAKOUT_LEN * wrap_multiplier),
+            generator.line(
+                generator.P2D(radius + 2 * BREAKOUT_LEN, BREAKOUT_LEN * wrap_multiplier),
+                generator.P2D(radius + 3 * BREAKOUT_LEN, BREAKOUT_LEN * wrap_multiplier),
                 TRACE_WIDTH,
                 TOP_LAYER
             )
@@ -124,9 +125,9 @@ if __name__ == '__main__':
     # trace does not throw the "The routing start point violates DRC error". I have found that a 0.5mm gap works ok in
     # most scenarios, with a 1.2mm wide pad. Feel free to adjust to your needs, but you've been warned.
     pads.append(
-        generate_pad(
+        generator.pad(
             1,
-            P2D(radius + 3 * BREAKOUT_LEN + 0.5, BREAKOUT_LEN * -wrap_multiplier),
+            generator.P2D(radius + 3 * BREAKOUT_LEN + 0.5, BREAKOUT_LEN * -wrap_multiplier),
             1.2,
             TRACE_WIDTH,
             TOP_LAYER
@@ -135,9 +136,9 @@ if __name__ == '__main__':
 
     if DUAL_LAYER:
         pads.append(
-            generate_pad(
+            generator.pad(
                 2,
-                P2D(radius + 3 * BREAKOUT_LEN + 0.5, BREAKOUT_LEN * wrap_multiplier),
+                generator.P2D(radius + 3 * BREAKOUT_LEN + 0.5, BREAKOUT_LEN * wrap_multiplier),
                 1.2,
                 TRACE_WIDTH,
                 TOP_LAYER
@@ -150,9 +151,9 @@ if __name__ == '__main__':
         "ARCS": ''.join(arcs),
         "VIAS": ''.join(vias),
         "PADS": ''.join(pads),
-        "TIMESTAMP1": gen_tstamp(),
-        "TIMESTAMP2": gen_tstamp(),
-        "TIMESTAMP3": gen_tstamp(),
+        "TIMESTAMP1": generator.tstamp(),
+        "TIMESTAMP2": generator.tstamp(),
+        "TIMESTAMP3": generator.tstamp(),
     }
 
     template = template.format(**substitution_dict)

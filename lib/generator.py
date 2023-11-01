@@ -1,5 +1,6 @@
 """
 Copyright (C) 2022 Colton Baldridge
+Copyright (C) 2023 Tim Goll
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -32,7 +33,7 @@ class P2D:
         return f"{self.x:.3f} {self.y:.3f}"
 
 
-def generate_via(loc: P2D, diameter: float, drill: float) -> str:
+def via(loc: P2D, diameter: float, drill: float) -> str:
     """
     Generates a via to be placed in the footprint file
     Args:
@@ -43,11 +44,11 @@ def generate_via(loc: P2D, diameter: float, drill: float) -> str:
     Returns:
         str: the via, formatted for use in the footprint file
     """
-    via = f'  (pad "" thru_hole circle (at {loc}) (size {diameter} {diameter}) (drill {drill}) (layers *.Cu *.Mask) ({gen_tstamp()}))\n'
+    via = f'  (pad "" thru_hole circle (at {loc}) (size {diameter} {diameter}) (drill {drill}) (layers *.Cu *.Mask) ({tstamp()}))\n'
     return via
 
 
-def generate_line(start: P2D, stop: P2D, width: float, layer: str) -> str:
+def line(start: P2D, stop: P2D, width: float, layer: str) -> str:
     """
     Generates a line to be placed in the footprint file
     Args:
@@ -59,11 +60,11 @@ def generate_line(start: P2D, stop: P2D, width: float, layer: str) -> str:
     Returns:
         str: the line, formatted for use in the footprint file
     """
-    line = f'  (fp_line (start {start}) (end {stop}) (layer "{layer}") (width {width:.3f}) ({gen_tstamp()}))\n'
+    line = f'  (fp_line (start {start}) (end {stop}) (layer "{layer}") (width {width:.3f}) ({tstamp()}))\n'
     return line
 
 
-def generate_arc(start: P2D, mid:P2D, stop: P2D, width: float, layer: str, swap_start_stop: bool) -> str:
+def arc(start: P2D, mid:P2D, stop: P2D, width: float, layer: str, swap_start_stop: bool) -> str:
     """
     Generates an arc to be placed in the footprint file
     Args:
@@ -80,14 +81,14 @@ def generate_arc(start: P2D, mid:P2D, stop: P2D, width: float, layer: str, swap_
     """
     if not swap_start_stop:
         arc = f'  (fp_arc (start {start}) (mid {mid})(end {stop}) (layer "{layer}") (width {width:.3f}) ' \
-              f'({gen_tstamp()}))\n'
+              f'({tstamp()}))\n'
     else:
         arc = f'  (fp_arc (start {stop}) (mid {mid})(end {start}) (layer "{layer}") (width {width:.3f}) ' \
-              f'({gen_tstamp()}))\n'
+              f'({tstamp()}))\n'
     return arc
 
 
-def generate_pad(pid: int, loc: P2D, width: float, height: float, layer: str) -> str:
+def pad(pid: int, loc: P2D, width: float, height: float, layer: str) -> str:
     """
     Generates a pad to be placed in the footprint file, note: no soldermask layer is added here like you might expect in
     a typical SMD pad (you could call this func with a different layer if you wanted to though)
@@ -102,11 +103,11 @@ def generate_pad(pid: int, loc: P2D, width: float, height: float, layer: str) ->
         str: the arc, formatted for use in the footprint file
     """
     pad = f'  (pad "{pid}" smd roundrect (at {loc}) (size {width} {height}) (layers "{layer}")' \
-          f' (roundrect_rratio 0.25) ({gen_tstamp()}))\n'
+          f' (roundrect_rratio 0.25) ({tstamp()}))\n'
     return pad
 
 
-def gen_tstamp() -> str:
+def tstamp() -> str:
     """
     Timestamps in KiCAD are really just UUIDs that pcbnew can link back to later (I think?).
     Source: https://docs.kicad.org/6.0/en/eeschema/eeschema.html#custom-netlist-and-bom-formats
@@ -117,7 +118,7 @@ def gen_tstamp() -> str:
     return f"tstamp {uuid.uuid4()}"
 
 
-def draw_loop(radius: float, increment: float, width: float, layer: str, wrap_multiplier: int) -> list[str]:
+def loop(radius: float, increment: float, width: float, layer: str, wrap_multiplier: int) -> list[str]:
     """
     Creates to arcs (in a loop), starting at radius, and finishing at radius + increment. Also adds increment to radius
     at the end
@@ -134,7 +135,7 @@ def draw_loop(radius: float, increment: float, width: float, layer: str, wrap_mu
         list containing 2 arcs in string form (will need to be put in .kicad_mod file)
     """
     arcs = [
-        generate_arc(
+        arc(
             P2D(radius, 0),
             P2D(0, -wrap_multiplier * radius),
             P2D(-radius, 0),
@@ -142,7 +143,7 @@ def draw_loop(radius: float, increment: float, width: float, layer: str, wrap_mu
             layer,
             bool(wrap_multiplier + 1)
         ),
-        generate_arc(
+        arc(
             P2D(-radius, 0),
             P2D(increment / 2, wrap_multiplier * (radius + increment / 2)),
             P2D(radius + increment, 0),
@@ -151,4 +152,5 @@ def draw_loop(radius: float, increment: float, width: float, layer: str, wrap_mu
             bool(wrap_multiplier + 1)
         )
     ]
+
     return arcs
