@@ -1,4 +1,9 @@
 import os
+import sys
+import time
+import tempfile
+import logging
+
 import wx # type: ignore
 import pcbnew # type: ignore
 
@@ -7,6 +12,8 @@ from .menu import *
 # WX GUI form that show coil settings
 class CoilGeneratorUI(wx.Frame):
 	def __init__(self):
+		super(CoilGeneratorUI, self).__init__()
+
 		self.width_label = 120
 		self.width_content = 180
 		self.padding = 5
@@ -21,6 +28,10 @@ class CoilGeneratorUI(wx.Frame):
 			style = wx.DEFAULT_DIALOG_STYLE
 		)
 
+		self._init_logger()
+		self.logger = logging.getLogger(__name__)
+		self.logger.log(logging.DEBUG, "Running Coil Generator")
+
 		self.sizer_box = wx.BoxSizer(wx.VERTICAL)
 
 		# self.app = wx.PySimpleApp()
@@ -31,17 +42,24 @@ class CoilGeneratorUI(wx.Frame):
 		for entry in menu_structure:
 			if entry["type"] == "choices":
 				self._make_choices(entry["label"], entry["choices"], entry["default"], entry["unit"])
+				self.logger.log(logging.DEBUG, "[UI] Adding Choices")
 
 			if entry["type"] == "checkbox":
 				self._make_checkbox(entry["label"], entry["default"], entry["unit"])
+				self.logger.log(logging.DEBUG, "[UI] Adding Checkbox")
 
 			if entry["type"] == "slider":
 				self._make_slider(entry["label"], entry["min"], entry["max"], entry["default"], entry["unit"])
+				self.logger.log(logging.DEBUG, "[UI] Adding Slider")
 
 			if entry["type"] == "text":
 				self._make_textbox(entry["label"], entry["default"], entry["unit"])
+				self.logger.log(logging.DEBUG, "[UI] Adding Textfield")
+
+			self.logger.log(logging.DEBUG, entry)
 
 		elem_button_generate = wx.Button(self, label="Generate Coil")
+		elem_button_generate.Bind(wx.EVT_BUTTON, self._on_generate_button_lick)
 
 		self.sizer_box.Add(elem_button_generate, 0, wx.ALL, self.padding)
 
@@ -111,6 +129,52 @@ class CoilGeneratorUI(wx.Frame):
 			sizer.Add(unit_label, 0, wx.ALL | wx.ALIGN_CENTER_VERTICAL, self.padding)
 
 		self.sizer_box.Add(sizer, 0, wx.ALL, self.padding)
+
+	def _on_generate_button_lick(self, event):
+		self.Destroy()
+		
+		board = pcbnew.GetBoard()
+
+		self.logger.log(logging.DEBUG, board)
+
+		# Create a TRACK object (trace)
+		trace = pcbnew.TRACK(board)
+		trace.SetStart(pcbnew.wxPointMM(0, 0))  # Starting point in millimeters
+		trace.SetEnd(pcbnew.wxPointMM(10, 10))  # Ending point in millimeters
+		trace.SetWidth(pcbnew.FromMM(0.15))  # Width of the trace in internal units
+
+		self.logger.log(logging.DEBUG, trace)
+
+		# Create a PCB_GROUP container and add the trace to it
+		group = pcbnew.PCB_GROUP(board)
+		group.Insert(trace)
+
+		self.logger.log(logging.DEBUG, group)
+
+		# Add the group to the board
+		board.Add(group)
+
+		# Update the board display
+		pcbnew.Refresh()
+
+	def _init_logger(self):
+		root = logging.getLogger()
+		root.handlers.clear()
+		root.setLevel(logging.DEBUG)
+
+		log_path = os.path.dirname(__file__)
+		log_file = os.path.join(log_path, "coilgenerator.log")
+
+		handler = logging.FileHandler(log_file)
+		handler.setLevel(logging.DEBUG)
+
+		formatter = logging.Formatter(
+			"%(asctime)s %(name)s %(lineno)d:%(message)s", datefmt="%m-%d %H:%M:%S"
+		)
+
+		handler.setFormatter(formatter)
+
+		root.addHandler(handler)
 
 
 # Plugin definition
