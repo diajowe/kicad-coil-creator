@@ -11,12 +11,18 @@ from .menu import *
 
 # WX GUI form that show coil settings
 class CoilGeneratorUI(wx.Frame):
-	def __init__(self):
+	def __init__(self, pcbnew_frame):
 		super(CoilGeneratorUI, self).__init__()
 
 		self.width_label = 120
 		self.width_content = 180
 		self.padding = 5
+
+		self._init_logger()
+		self.logger = logging.getLogger(__name__)
+		self.logger.log(logging.DEBUG, "Running Coil Generator")
+
+		self._pcbnew_frame = pcbnew_frame
 
 		wx.Dialog.__init__(
 			self,
@@ -27,10 +33,6 @@ class CoilGeneratorUI(wx.Frame):
 			size = wx.DefaultSize,
 			style = wx.DEFAULT_DIALOG_STYLE
 		)
-
-		self._init_logger()
-		self.logger = logging.getLogger(__name__)
-		self.logger.log(logging.DEBUG, "Running Coil Generator")
 
 		self.sizer_box = wx.BoxSizer(wx.VERTICAL)
 
@@ -132,30 +134,51 @@ class CoilGeneratorUI(wx.Frame):
 
 	def _on_generate_button_lick(self, event):
 		self.Destroy()
+
+		# todo placeholder		
+		path = os.path.dirname(__file__)
+		file = os.path.join(path, "COIL_GENERATOR_1.kicad_mod")
+
+		self.logger.log(logging.DEBUG, "reading file...")
+
+		with open(file, "r") as file:
+			template = file.read()
+		self.logger.log(logging.DEBUG, "read file")
+
+		# copy the generated footprint into clipboard
+		clipboard = wx.Clipboard.Get()
+		if clipboard.Open():
+			self.logger.log(logging.DEBUG, "Adding to clipboard")
+
+			clipboard.SetData(wx.TextDataObject(template))
+			clipboard.Close()
+		else:                    
+			self.logger.log(logging.DEBUG, "Clipboard error")
+
+			return
 		
-		board = pcbnew.GetBoard()
+		# paste generated foodprint into the pcbview
+		try:
+			evt = wx.KeyEvent(wx.wxEVT_CHAR_HOOK)
+			evt.SetKeyCode(ord('V'))
+			evt.SetControlDown(True)
+			self.logger.log(logging.INFO, "Using wx.KeyEvent for paste")
+	
+			wnd = [i for i in self._pcbnew_frame.Children if i.ClassName == 'wxWindow'][0]
 
-		self.logger.log(logging.DEBUG, board)
-
-		# Create a TRACK object (trace)
-		trace = pcbnew.TRACK(board)
-		trace.SetStart(pcbnew.wxPointMM(0, 0))  # Starting point in millimeters
-		trace.SetEnd(pcbnew.wxPointMM(10, 10))  # Ending point in millimeters
-		trace.SetWidth(pcbnew.FromMM(0.15))  # Width of the trace in internal units
-
-		self.logger.log(logging.DEBUG, trace)
-
-		# Create a PCB_GROUP container and add the trace to it
-		group = pcbnew.PCB_GROUP(board)
-		group.Insert(trace)
-
-		self.logger.log(logging.DEBUG, group)
-
-		# Add the group to the board
-		board.Add(group)
-
-		# Update the board display
-		pcbnew.Refresh()
+			self.logger.log(logging.INFO, "Injecting event: {} into window: {}".format(evt, wnd))
+			wx.PostEvent(wnd, evt)
+		except:
+			# Likely on Linux with old wx python support :(
+			self.logger.log(logging.INFO, "Using wx.UIActionSimulator for paste")
+			keyinput = wx.UIActionSimulator()
+			self._pcbnew_frame.Raise()
+			self._pcbnew_frame.SetFocus()
+			wx.MilliSleep(100)
+			wx.Yield()
+			# Press and release CTRL + V
+			keyinput.Char(ord("V"), wx.MOD_CONTROL)
+			wx.MilliSleep(100)
 
 	def _init_logger(self):
 		root = logging.getLogger()
@@ -176,6 +199,14 @@ class CoilGeneratorUI(wx.Frame):
 
 		root.addHandler(handler)
 
+# use this class to track the last focused page
+class FocusTracker(wx.EvtHandler):
+	def __init__(self):
+		wx.EvtHandler.__init__(self)
+		self.prev_focused_window = None
+
+	def OnFocus(self, event):
+		self.prev_focused_window = event.GetEventObject()
 
 # Plugin definition
 class Plugin(pcbnew.ActionPlugin):
@@ -188,5 +219,11 @@ class Plugin(pcbnew.ActionPlugin):
 		self.icon_file_name = os.path.join(os.path.dirname(__file__), 'icon.png')
 		self.dark_icon_file_name = os.path.join(os.path.dirname(__file__), 'icon.png')
 
+		self.focus_tracker = FocusTracker()
+
+		# if a window loses focus, this event updates the last focused window
+		for window in wx.GetTopLevelWindows():
+			window.Bind(wx.EVT_SET_FOCUS, self.focus_tracker.OnFocus)
+			
 	def Run(self):
-		CoilGeneratorUI().Show()
+		CoilGeneratorUI(self.focus_tracker.prev_focused_window).Show()
