@@ -17,27 +17,26 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
 
-from lib import generator
+import os
+import logging
+from . import generator
 
-"""  ~~~  ENTER PARAMETERS BELOW  ~~~  """
 NAME = "COIL_GENERATOR_1"  # Name of footprint
-LAYER_COUNT = 4  # Currently supported: 1, 2, 4
-WRAP_CLOCKWISE = True  # Wraps CCW if false
-N_TURNS = 23  # Must be an int
-TRACE_WIDTH = 0.09  # (mm)
-TRACE_SPACING = 0.09  # (mm)
-VIA_DIAMETER = 0.5  # (mm)
-VIA_DRILL = 0.3  # (mm)
-OUTER_DIAMETER = 12  # (mm)
-BREAKOUT_LEN = 0.5  # (mm) scalar used to affect location of the breakouts
 TEMPLATE_FILE = "template.kicad_mod"
 LAYER_TOP = "F.Cu"
 LAYER_BOTTOM = "B.Cu"
 LAYER_INNER = ["In1.Cu", "In2.Cu"]
 
-if __name__ == '__main__':
-	with open("ref/" + TEMPLATE_FILE, 'r') as file:
+BREAKOUT_LEN = 0.5  # (mm)
+
+def generate(logger, LAYER_COUNT, WRAP_CLOCKWISE, N_TURNS, TRACE_WIDTH, TRACE_SPACING, VIA_DIAMETER, VIA_DRILL, OUTER_DIAMETER):
+	template_path = os.path.dirname(__file__)
+	template_file = os.path.join(template_path, TEMPLATE_FILE)
+
+	with open(template_file, "r") as file:
 		template = file.read()
+
+	logger.log(logging.INFO, template)
 
 	arcs = []
 	vias = []
@@ -45,6 +44,8 @@ if __name__ == '__main__':
 	pads = []
 
 	current_radius = OUTER_DIAMETER / 2 - N_TURNS * TRACE_WIDTH - (N_TURNS - 1) * TRACE_SPACING
+
+	logger.log(logging.INFO, "inner radius: " + str(current_radius))
 
 	# place center via where it belongs
 	vias.append(
@@ -66,6 +67,7 @@ if __name__ == '__main__':
 			VIA_DRILL
 		))
 
+	logger.log(logging.INFO, "vias done")
 
 	# build out arcs to spec, until # turns is reached
 	wrap_multiplier = 1 if WRAP_CLOCKWISE else -1
@@ -300,6 +302,9 @@ if __name__ == '__main__':
 			)
 		)
 
+	logger.log(logging.INFO, "-----------------------------------------------------")
+	logger.log(logging.INFO, template)
+
 	substitution_dict = {
 		"NAME": NAME,
 		"LINES": ''.join(lines),
@@ -311,9 +316,4 @@ if __name__ == '__main__':
 		"TIMESTAMP3": generator.tstamp(),
 	}
 
-	template = template.format(**substitution_dict)
-
-	with open(f'{NAME}.kicad_mod', 'w') as outfile:
-		outfile.write(template)
-		outfile.close()
-
+	return template.format(**substitution_dict)

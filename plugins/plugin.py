@@ -1,13 +1,11 @@
 import os
-import sys
-import time
-import tempfile
 import logging
 
 import wx # type: ignore
 import pcbnew # type: ignore
 
 from .menu import *
+from .lib import coilgenerator
 
 # WX GUI form that show coil settings
 class CoilGeneratorUI(wx.Frame):
@@ -43,19 +41,19 @@ class CoilGeneratorUI(wx.Frame):
 
 		for entry in menu_structure:
 			if entry["type"] == "choices":
-				self._make_choices(entry["label"], entry["choices"], entry["default"], entry["unit"])
+				entry["wx_elem"] = self._make_choices(entry["label"], entry["choices"], entry["default"], entry["unit"])
 				self.logger.log(logging.DEBUG, "[UI] Adding Choices")
 
 			if entry["type"] == "checkbox":
-				self._make_checkbox(entry["label"], entry["default"], entry["unit"])
+				entry["wx_elem"] = self._make_checkbox(entry["label"], entry["default"], entry["unit"])
 				self.logger.log(logging.DEBUG, "[UI] Adding Checkbox")
 
 			if entry["type"] == "slider":
-				self._make_slider(entry["label"], entry["min"], entry["max"], entry["default"], entry["unit"])
+				entry["wx_elem"] = self._make_slider(entry["label"], entry["min"], entry["max"], entry["default"], entry["unit"])
 				self.logger.log(logging.DEBUG, "[UI] Adding Slider")
 
 			if entry["type"] == "text":
-				self._make_textbox(entry["label"], entry["default"], entry["unit"])
+				entry["wx_elem"] = self._make_textbox(entry["label"], entry["default"], entry["unit"])
 				self.logger.log(logging.DEBUG, "[UI] Adding Textfield")
 
 			self.logger.log(logging.DEBUG, entry)
@@ -82,6 +80,8 @@ class CoilGeneratorUI(wx.Frame):
 			unit
 		)
 
+		return elem_choices
+
 	def _make_checkbox(self, label, default = 0, unit = None):
 		elem_label = wx.StaticText(self, label=label)
 		elem_check = wx.CheckBox(self)
@@ -92,6 +92,8 @@ class CoilGeneratorUI(wx.Frame):
 			unit
 		)
 
+		return elem_check
+
 	def _make_slider(self, label, min, max, default = 0, unit = None):
 		elem_label = wx.StaticText(self, label=label)
 		elem_slider = wx.Slider(self, value = 50, minValue = min, maxValue = max, style = wx.SL_HORIZONTAL | wx.SL_LABELS)
@@ -101,6 +103,8 @@ class CoilGeneratorUI(wx.Frame):
 			elem_slider,
 			unit
 		)
+
+		return elem_slider
 
 	def _make_textbox(self, label, default = 0, unit = None):
 		elem_label = wx.StaticText(self, label=label)
@@ -113,6 +117,8 @@ class CoilGeneratorUI(wx.Frame):
 			elem_text,
 			unit
 		)
+
+		return elem_text
 
 	def _add_content(self, elem_label, elem_content, unit):
 		elem_label.SetMinSize((self.width_label, -1))
@@ -132,18 +138,56 @@ class CoilGeneratorUI(wx.Frame):
 
 		self.sizer_box.Add(sizer, 0, wx.ALL, self.padding)
 
+	def _parse_data(self, identifier):
+		self.logger.log(logging.INFO, "Finding value for: " + identifier)
+		for entry in menu_structure:
+			if entry["id"] != identifier:
+				continue
+
+			self.logger.log(logging.INFO, "Located element, extracting data...")
+
+			val = None
+
+			if entry["type"] == "choices":
+				val = entry["choices_data"][entry["wx_elem"].GetSelection()]
+			elif entry["type"] == "checkbox":
+				val = entry["wx_elem"].GetValue()
+			elif entry["type"] == "slider":
+				val = entry["wx_elem"].GetValue()
+			elif entry["type"] == "text":
+				val = entry["wx_elem"].GetValue()
+
+			self.logger.log(logging.INFO, "Raw data: " + str(val))
+
+			if entry["datatype"] == "float":
+				return float(val)
+			elif entry["datatype"] == "int":
+				return int(val)
+			elif entry["datatype"] == "bool":
+				return bool(val)
+			else:
+				return str(val)
+
+
 	def _on_generate_button_lick(self, event):
 		self.Destroy()
 
-		# todo placeholder		
-		path = os.path.dirname(__file__)
-		file = os.path.join(path, "COIL_GENERATOR_1.kicad_mod")
+		self.logger.log(logging.INFO, "Generating coil ...")
 
-		self.logger.log(logging.DEBUG, "reading file...")
+		template = coilgenerator.generate(
+			self.logger,
+			self._parse_data("layer_count"),
+			self._parse_data("turn_direction"),
+			self._parse_data("turns_count"),
+			self._parse_data("trace_width"),
+			self._parse_data("trace_spacing"),
+			self._parse_data("via_outer"),
+			self._parse_data("via_drill"),
+			self._parse_data("outer_diameter")
+		)
 
-		with open(file, "r") as file:
-			template = file.read()
-		self.logger.log(logging.DEBUG, "read file")
+		self.logger.log(logging.INFO, template)
+		self.logger.log(logging.INFO, "Done.")
 
 		# copy the generated footprint into clipboard
 		clipboard = wx.Clipboard.Get()
@@ -157,7 +201,7 @@ class CoilGeneratorUI(wx.Frame):
 
 			return
 		
-		# paste generated foodprint into the pcbview
+		# paste generated footprint into the pcbview
 		try:
 			evt = wx.KeyEvent(wx.wxEVT_CHAR_HOOK)
 			evt.SetKeyCode(ord('V'))
