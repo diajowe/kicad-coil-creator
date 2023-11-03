@@ -18,25 +18,21 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
 
 import os
-import logging
 from . import generator
 
 NAME = "COIL_GENERATOR_1"  # Name of footprint
-TEMPLATE_FILE = "template.kicad_mod"
+TEMPLATE_FILE = "../dynamic/template.kicad_mod"
 LAYER_TOP = "F.Cu"
 LAYER_BOTTOM = "B.Cu"
 LAYER_INNER = ["In1.Cu", "In2.Cu"]
 
 BREAKOUT_LEN = 0.5  # (mm)
 
-def generate(logger, LAYER_COUNT, WRAP_CLOCKWISE, N_TURNS, TRACE_WIDTH, TRACE_SPACING, VIA_DIAMETER, VIA_DRILL, OUTER_DIAMETER):
-	template_path = os.path.dirname(__file__)
-	template_file = os.path.join(template_path, TEMPLATE_FILE)
+def generate(LAYER_COUNT, WRAP_CLOCKWISE, N_TURNS, TRACE_WIDTH, TRACE_SPACING, VIA_DIAMETER, VIA_DRILL, OUTER_DIAMETER):
+	template_file = os.path.join(os.path.dirname(__file__), TEMPLATE_FILE)
 
 	with open(template_file, "r") as file:
 		template = file.read()
-
-	logger.log(logging.INFO, template)
 
 	arcs = []
 	vias = []
@@ -44,8 +40,6 @@ def generate(logger, LAYER_COUNT, WRAP_CLOCKWISE, N_TURNS, TRACE_WIDTH, TRACE_SP
 	pads = []
 
 	current_radius = OUTER_DIAMETER / 2 - N_TURNS * TRACE_WIDTH - (N_TURNS - 1) * TRACE_SPACING
-
-	logger.log(logging.INFO, "inner radius: " + str(current_radius))
 
 	# place center via where it belongs
 	vias.append(
@@ -66,8 +60,6 @@ def generate(logger, LAYER_COUNT, WRAP_CLOCKWISE, N_TURNS, TRACE_WIDTH, TRACE_SP
 			VIA_DIAMETER,
 			VIA_DRILL
 		))
-
-	logger.log(logging.INFO, "vias done")
 
 	# build out arcs to spec, until # turns is reached
 	wrap_multiplier = 1 if WRAP_CLOCKWISE else -1
@@ -301,9 +293,6 @@ def generate(logger, LAYER_COUNT, WRAP_CLOCKWISE, N_TURNS, TRACE_WIDTH, TRACE_SP
 				LAYER_BOTTOM
 			)
 		)
-
-	logger.log(logging.INFO, "-----------------------------------------------------")
-	logger.log(logging.INFO, template)
 
 	substitution_dict = {
 		"NAME": NAME,

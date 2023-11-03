@@ -1,4 +1,4 @@
-menu_structure = [
+structure = [
 	{
         "id" : "layer_count",
 		"type" : "choices",

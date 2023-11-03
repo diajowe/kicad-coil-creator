@@ -4,7 +4,7 @@ import logging
 import wx # type: ignore
 import pcbnew # type: ignore
 
-from .menu import *
+from .lib import menu
 from .lib import coilgenerator
 
 # WX GUI form that show coil settings
@@ -39,7 +39,7 @@ class CoilGeneratorUI(wx.Frame):
 		self.SetIcon(icon)
 		self.SetBackgroundColour(wx.LIGHT_GREY)
 
-		for entry in menu_structure:
+		for entry in menu.structure:
 			if entry["type"] == "choices":
 				entry["wx_elem"] = self._make_choices(entry["label"], entry["choices"], entry["default"], entry["unit"])
 				self.logger.log(logging.DEBUG, "[UI] Adding Choices")
@@ -59,7 +59,7 @@ class CoilGeneratorUI(wx.Frame):
 			self.logger.log(logging.DEBUG, entry)
 
 		elem_button_generate = wx.Button(self, label="Generate Coil")
-		elem_button_generate.Bind(wx.EVT_BUTTON, self._on_generate_button_lick)
+		elem_button_generate.Bind(wx.EVT_BUTTON, self._on_generate_button_klick)
 
 		self.sizer_box.Add(elem_button_generate, 0, wx.ALL, self.padding)
 
@@ -140,7 +140,7 @@ class CoilGeneratorUI(wx.Frame):
 
 	def _parse_data(self, identifier):
 		self.logger.log(logging.INFO, "Finding value for: " + identifier)
-		for entry in menu_structure:
+		for entry in menu.structure:
 			if entry["id"] != identifier:
 				continue
 
@@ -169,13 +169,12 @@ class CoilGeneratorUI(wx.Frame):
 				return str(val)
 
 
-	def _on_generate_button_lick(self, event):
+	def _on_generate_button_klick(self, event):
 		self.Destroy()
 
 		self.logger.log(logging.INFO, "Generating coil ...")
 
 		template = coilgenerator.generate(
-			self.logger,
 			self._parse_data("layer_count"),
 			self._parse_data("turn_direction"),
 			self._parse_data("turns_count"),
@@ -230,7 +229,7 @@ class CoilGeneratorUI(wx.Frame):
 		root.setLevel(logging.DEBUG)
 
 		log_path = os.path.dirname(__file__)
-		log_file = os.path.join(log_path, "coilgenerator.log")
+		log_file = os.path.join(log_path, "dynamic/coilgenerator.log")
 
 		handler = logging.FileHandler(log_file)
 		handler.setLevel(logging.DEBUG)
