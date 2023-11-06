@@ -3,7 +3,7 @@
     "name": "PCB Coil Generator",
     "description": "Generates PCB coils for KiCad",
     "description_full": "Toolkit for generating PCB coils from within KiCad and using them as footprints.\n\nAll pramaters can be set from within a UI that can be found in the action toolbar.",
-    "identifier": "com.github.bennymeg.JLC-Plugin-for-KiCad",
+    "identifier": "com.github.DIaLOGIKa-GmbH.kicad-coil-creator",
     "type": "plugin",
     "author": {
         "name": "Tim Goll, DIaLOGIKa",
