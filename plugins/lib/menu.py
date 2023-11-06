@@ -1,5 +1,12 @@
 structure = [
 	{
+        "id" : "name",
+		"type" : "text",
+		"label" : "footprint name",
+		"default" : "COIL_GENERATOR",
+        "datatype" : "str",
+		"unit" : None
+	},{
         "id" : "layer_count",
 		"type" : "choices",
 		"label" : "layer count",

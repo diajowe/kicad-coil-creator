@@ -20,7 +20,6 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 import os
 from . import generator
 
-NAME = "COIL_GENERATOR_1"  # Name of footprint
 TEMPLATE_FILE = "../dynamic/template.kicad_mod"
 LAYER_TOP = "F.Cu"
 LAYER_BOTTOM = "B.Cu"
@@ -28,7 +27,7 @@ LAYER_INNER = ["In1.Cu", "In2.Cu"]
 
 BREAKOUT_LEN = 0.5  # (mm)
 
-def generate(LAYER_COUNT, WRAP_CLOCKWISE, N_TURNS, TRACE_WIDTH, TRACE_SPACING, VIA_DIAMETER, VIA_DRILL, OUTER_DIAMETER):
+def generate(LAYER_COUNT, WRAP_CLOCKWISE, N_TURNS, TRACE_WIDTH, TRACE_SPACING, VIA_DIAMETER, VIA_DRILL, OUTER_DIAMETER, NAME):
 	template_file = os.path.join(os.path.dirname(__file__), TEMPLATE_FILE)
 
 	with open(template_file, "r") as file:

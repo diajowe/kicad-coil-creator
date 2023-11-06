@@ -40,22 +40,27 @@ class CoilGeneratorUI(wx.Frame):
 		self.SetIcon(icon)
 		self.SetBackgroundColour(wx.LIGHT_GREY)
 
+		self._prepare_defaults_from_cached_settings(menu.structure)
+
 		for entry in menu.structure:
 			if entry["type"] == "choices":
 				entry["wx_elem"] = self._make_choices(entry["label"], entry["choices"], entry["default"], entry["unit"])
-				entry["wx_elem"].Bind(wx.EVT_CHOICE, lambda event: self._on_choice_change(event, entry["id"]), self.choice_ctrl)
+				self.Bind(wx.EVT_CHOICE, self._on_choice_change, entry["wx_elem"])
 				self.logger.log(logging.DEBUG, "[UI] Adding Choices")
 
 			if entry["type"] == "checkbox":
 				entry["wx_elem"] = self._make_checkbox(entry["label"], entry["default"], entry["unit"])
+				self.Bind(wx.EVT_CHECKBOX, self._on_value_change, entry["wx_elem"])
 				self.logger.log(logging.DEBUG, "[UI] Adding Checkbox")
 
 			if entry["type"] == "slider":
 				entry["wx_elem"] = self._make_slider(entry["label"], entry["min"], entry["max"], entry["default"], entry["unit"])
+				self.Bind(wx.EVT_SCROLL, self._on_value_change, entry["wx_elem"])
 				self.logger.log(logging.DEBUG, "[UI] Adding Slider")
 
 			if entry["type"] == "text":
 				entry["wx_elem"] = self._make_textbox(entry["label"], entry["default"], entry["unit"])
+				self.Bind(wx.EVT_TEXT, self._on_value_change, entry["wx_elem"])
 				self.logger.log(logging.DEBUG, "[UI] Adding Textfield")
 
 			self.logger.log(logging.DEBUG, entry)
@@ -70,8 +75,23 @@ class CoilGeneratorUI(wx.Frame):
 		self.sizer_box.Fit(self)
 		self.Centre(wx.BOTH)
 
-	def _on_choice_change(self, event, identifier):
+	def _on_choice_change(self, event):
+		identifier = ""
+
+		for entry in menu.structure:
+			if entry["wx_elem"] == event.GetEventObject():
+				identifier = entry["id"]
+
 		self._update_cached_setting(identifier, event.GetEventObject().GetSelection())
+
+	def _on_value_change(self, event):
+		identifier = ""
+
+		for entry in menu.structure:
+			if entry["wx_elem"] == event.GetEventObject():
+				identifier = entry["id"]
+
+		self._update_cached_setting(identifier, event.GetEventObject().GetValue())
 
 	def _make_choices(self, label, choices, default = 0, unit = None):
 		elem_label = wx.StaticText(self, label=label)
@@ -91,6 +111,8 @@ class CoilGeneratorUI(wx.Frame):
 		elem_label = wx.StaticText(self, label=label)
 		elem_check = wx.CheckBox(self)
 
+		elem_check.SetValue(default)
+
 		self._add_content(
 			elem_label,
 			elem_check,
@@ -102,6 +124,8 @@ class CoilGeneratorUI(wx.Frame):
 	def _make_slider(self, label, min, max, default = 0, unit = None):
 		elem_label = wx.StaticText(self, label=label)
 		elem_slider = wx.Slider(self, value = 50, minValue = min, maxValue = max, style = wx.SL_HORIZONTAL | wx.SL_LABELS)
+
+		elem_slider.SetValue(default)
 
 		self._add_content(
 			elem_label,
@@ -180,9 +204,23 @@ class CoilGeneratorUI(wx.Frame):
 			data = json.load(file)
 
 		data[identifier] = value
-			
+
 		with open(cache_file, "w") as file:
 			json.dump(data, file, indent=4)
+
+	def _prepare_defaults_from_cached_settings(self, menu_array):
+		cache_file = os.path.join(os.path.dirname(__file__), "dynamic/lastconfig.json")
+
+		with open(cache_file, "r") as file:
+			data = json.load(file)
+
+		for entry in menu_array:
+			try:
+				id = entry["id"]
+				thisdefault = data[id]
+				entry["default"] = thisdefault
+			except KeyError:
+				continue
 
 	def _on_generate_button_klick(self, event):
 		self.Destroy()
@@ -197,7 +235,8 @@ class CoilGeneratorUI(wx.Frame):
 			self._parse_data("trace_spacing"),
 			self._parse_data("via_outer"),
 			self._parse_data("via_drill"),
-			self._parse_data("outer_diameter")
+			self._parse_data("outer_diameter"),
+			self._parse_data("name")
 		)
 
 		self.logger.log(logging.INFO, template)
