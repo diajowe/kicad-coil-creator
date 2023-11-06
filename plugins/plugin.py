@@ -17,6 +17,12 @@ class CoilGeneratorUI(wx.Frame):
 		self.width_content = 180
 		self.padding = 5
 
+		self.board = pcbnew.GetBoard()
+		self.path_project = os.path.dirname(self.board.GetFileName())
+		self.path_footprint_folder_name = "/coil_footprints/"
+		self.path_footprint_folder = self.path_project + self.path_footprint_folder_name
+		self.path_fp_lib_table = self.path_project + "/fp-lib-table"
+
 		self._init_logger()
 		self.logger = logging.getLogger(__name__)
 		self.logger.log(logging.DEBUG, "Running Coil Generator")
@@ -68,7 +74,11 @@ class CoilGeneratorUI(wx.Frame):
 		elem_button_generate = wx.Button(self, label="Generate Coil")
 		elem_button_generate.Bind(wx.EVT_BUTTON, self._on_generate_button_klick)
 
+		elem_button_save = wx.Button(self, label="Save as Project Footprint")
+		elem_button_save.Bind(wx.EVT_BUTTON, self._on_save_button_klick)
+
 		self.sizer_box.Add(elem_button_generate, 0, wx.ALL, self.padding)
+		self.sizer_box.Add(elem_button_save, 0, wx.ALL, self.padding)
 
 		self.SetSizer(self.sizer_box)
 		self.Layout()
@@ -222,7 +232,7 @@ class CoilGeneratorUI(wx.Frame):
 			except KeyError:
 				continue
 
-	def _on_generate_button_klick(self, event):
+	def _handle_coil_generation(self):
 		self.Destroy()
 
 		self.logger.log(logging.INFO, "Generating coil ...")
@@ -239,8 +249,74 @@ class CoilGeneratorUI(wx.Frame):
 			self._parse_data("name")
 		)
 
-		self.logger.log(logging.INFO, template)
 		self.logger.log(logging.INFO, "Done.")
+
+		return template
+	
+	def _add_to_fp_lib(self):
+		entry = "  (lib (name \"PCB Coils\")"
+		entry += "(type \"KiCad\")"
+		entry += "(uri \"${KIPRJMOD}" + self.path_footprint_folder_name + "\")"
+		entry += "(options \"\")"
+		entry += "(descr \"auto-generated coil footprints\"))"
+
+		if os.path.exists(self.path_fp_lib_table):
+			# Read the existing content of fp-lib-table
+			with open(self.path_fp_lib_table, "r") as file:
+				lines = file.readlines()
+
+
+			# Find the position of the closing bracket
+			closing_bracket_index = None
+			for i, line in enumerate(lines):
+				if line.strip() == ")":
+					closing_bracket_index = i
+
+					break
+
+			# Insert the new entry just before the closing bracket
+			if closing_bracket_index is not None:
+				lines.insert(closing_bracket_index, entry)
+
+			self.logger.log(logging.INFO, "Inserted into footprint library file")
+		else:
+			lines = [
+				"(fp_lib_table\n",
+  				"  (version 7)\n",
+				entry + "\n",
+				")\n"
+			]
+
+			self.logger.log(logging.INFO, "Creating new footprint library file")
+
+		# Write the modified content back to the file
+		with open(self.path_fp_lib_table, "w") as file:
+			file.writelines(lines)
+			file.close()
+
+		# reload footprints not really possible?
+		pcbnew.Refresh() # Refresh the user interface
+
+	def _on_save_button_klick(self, event):
+		template = self. _handle_coil_generation()
+
+		# if the folder does not exist yet, it should be created and added to
+		# the project library path
+		if not os.path.exists(self.path_footprint_folder):
+			os.makedirs(self.path_footprint_folder)
+
+			self._add_to_fp_lib()
+
+			self.logger.log(logging.INFO, "Created new footprint folder, added to project library")
+		else:
+			self.logger.log(logging.INFO, "Footprint folder already exists")
+
+		with open(self.path_footprint_folder + get_safe_name(self._parse_data("name")) + ".kicad_mod", "w") as file:
+			file.write(template)
+			file.close()
+
+	def _on_generate_button_klick(self, event):
+		template = self. _handle_coil_generation()
 
 		# copy the generated footprint into clipboard
 		clipboard = wx.Clipboard.Get()
@@ -294,6 +370,9 @@ class CoilGeneratorUI(wx.Frame):
 		handler.setFormatter(formatter)
 
 		root.addHandler(handler)
+
+def get_safe_name(name, keepcharacters = (' ','.','_')):
+    return "".join(c for c in name if c.isalnum() or c in keepcharacters).rstrip()
 
 # use this class to track the last focused page
 class FocusTracker(wx.EvtHandler):
