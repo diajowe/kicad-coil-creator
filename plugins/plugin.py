@@ -19,7 +19,7 @@ class CoilGeneratorUI(wx.Frame):
 
 		self.board = pcbnew.GetBoard()
 		self.path_project = os.path.dirname(self.board.GetFileName())
-		self.path_footprint_folder_name = "/coil_footprints/"
+		self.path_footprint_folder_name = "/pcb_coils/"
 		self.path_footprint_folder = self.path_project + self.path_footprint_folder_name
 		self.path_fp_lib_table = self.path_project + "/fp-lib-table"
 

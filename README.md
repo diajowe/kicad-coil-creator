@@ -1,26 +1,19 @@
-# kicad-coil-creator
-Creates coil footprints in KiCAD, what more could you want?
+# KiCad Coil Generator UI
 
-### How to use
-Open main.py, put in the desired specs of your coil (described below), then let run `python3 main.py`. It's that simple!
+This tool creates PCB coils that can be either directly inserted into the PCB itself, or exported as a footprint. The UI can be accessed from within the PCB editor:
 
-### Coil Parameters
-|Parameter|Type|Description|
-|---|---|---|
-|NAME|String| Name of the KiCAD footprint being created |
-|DUAL_LAYER|Bool| Whether the coil should be 2 layers of not |
-|WRAP_CLOCKWISE|Bool| Coil wraps clockwise if true, counter-clockwise if false |
-|N_TURNS|Int| Turns the coil should make |
-|TRACE_WIDTH|Float| Width of the trace making the coil |
-|TRACE_SPACING|Float| Distance between the traces of the coil |
-|VIA_DIAMETER|Float| Diameter of the via at the center and, if dual layer, at the outside of the coil |
-|VIA_DRILL|Float| Drill hole size of the via at the center and, if dual layer, at the outside of the coil |
-|VIA_OFFSET|Float| Distance from the center of the coil to the left innermost edge of the central via |
-|BREAKOUT_LEN|Float| Scalar used to affect location of the breakout traces |
-|TEMPLATE_FILE|String| Template file that the script fills in, default "template.kicad_mod" is included |
-|TOP_LAYER|String| Layer to place the top of the coil onto |
-|BOTTOM_LAYER|String| = Layer to place the bottom of the coil onto |
+![the coild generator UI](assets/ui.png)
+_(The button for the UI is located within the addon section)_
 
-### Useful Links
- - [TI's app note on coil design for sensing](https://www.ti.com/lit/an/snoa930c/snoa930c.pdf)
- - [TI's coil design calculator](https://webench.ti.com/wb5/LDC/)
+This UI contains all relevant PCB coil settings to generate any desired coil.
+
+## Generate Coil
+
+By pressing the `Generate Coil` button, a new coil footprint is generated and inserted into the board. It can be moved freely but it has no schematic symbol attached to it. This makes it a bit tricky with netlists.
+
+![generated coil](assets/pcb_editor.png)
+_(Generated coil inside the PCB editor)_
+
+## Save as Project Footprint
+
+Once a fitting coil has been generated, that coil can be stored on disk as a footprint. The coil generator creates a new footprint library in the project's folder named `PCB Coils` (`pcb_coils` on disk) that is automatically set as project library in the current project.
