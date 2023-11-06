@@ -17,3 +17,16 @@ _(Generated coil inside the PCB editor)_
 ## Save as Project Footprint
 
 Once a fitting coil has been generated, that coil can be stored on disk as a footprint. The coil generator creates a new footprint library in the project's folder named `PCB Coils` (`pcb_coils` on disk) that is automatically set as project library in the current project.
+
+![](assets/as_footprint.png)
+_(Footprint automatically exported can be viewed in the footprint editor)_
+
+**Note:** KiCad sometimes does not detect the addition of a new library to the project. A restart of the program fixes that issue.
+
+## Future Goals
+
+- [ ] Rewrite of the generator code, as it is currently based on a two layer implementation that was only extended for 4 layers
+- [ ] Add more layer support
+- [ ] Add support for stretched coils
+- [ ] Add support for rectangular coils
+- [ ] Display coil statistics in the UI, [similar to TI's implementation](https://webench.ti.com/wb5/LDC)
