@@ -383,15 +383,6 @@ class CoilGeneratorUI(wx.Frame):
 def get_safe_name(name, keepcharacters = (' ','.','_')):
     return "".join(c for c in name if c.isalnum() or c in keepcharacters).rstrip()
 
-# use this class to track the last focused page
-class FocusTracker(wx.EvtHandler):
-	def __init__(self):
-		wx.EvtHandler.__init__(self)
-		self.prev_focused_window = None
-
-	def OnFocus(self, event):
-		self.prev_focused_window = event.GetEventObject()
-
 # Plugin definition
 class Plugin(pcbnew.ActionPlugin):
 	def __init__(self):
@@ -402,12 +393,8 @@ class Plugin(pcbnew.ActionPlugin):
 		self.show_toolbar_button = True
 		self.icon_file_name = os.path.join(os.path.dirname(__file__), 'icon.png')
 		self.dark_icon_file_name = os.path.join(os.path.dirname(__file__), 'icon.png')
-
-		self.focus_tracker = FocusTracker()
-
-		# if a window loses focus, this event updates the last focused window
-		for window in wx.GetTopLevelWindows():
-			window.Bind(wx.EVT_SET_FOCUS, self.focus_tracker.OnFocus)
 			
 	def Run(self):
-		CoilGeneratorUI(self.focus_tracker.prev_focused_window).Show()
+		# Assuming the PCBNew window is focused when run function is executed
+		# Alternative would be to keep track of last focussed window, which does not seem to work on all systems
+		CoilGeneratorUI(wx.Window.FindFocus()).Show()
