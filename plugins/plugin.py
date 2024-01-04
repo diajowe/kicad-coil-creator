@@ -386,6 +386,6 @@ class Plugin(pcbnew.ActionPlugin):
 		self.dark_icon_file_name = os.path.join(os.path.dirname(__file__), 'icon.png')
 			
 	def Run(self):
-		# Assuming the PCBNew window is focussed when run function is executed
+		# Assuming the PCBNew window is focused when run function is executed
 		# Alternative would be to keep track of last focussed window, which does not seem to work on all systems
 		CoilGeneratorUI(wx.Window.FindFocus()).Show()
