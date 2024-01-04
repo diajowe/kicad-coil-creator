@@ -49,7 +49,16 @@ class CoilGeneratorUI(wx.Frame):
 		self._prepare_defaults_from_cached_settings(menu.structure)
 
 		for entry in menu.structure:
-			if entry["type"] == "choices":
+			if entry["type"] == "choices" or entry["type"] == "choices_from_board":
+
+				# if choice structure values are sourced from board variables, some fields need to be dynamically generated before applying general choice handling
+				if entry["type"] == "choices_from_board":
+					if entry["choices_source"] == "COPPER_LAYER_COUNT":
+						entries_str = [str(e) for e in range(1, pcbnew.GetBoard().GetCopperLayerCount()+1)]
+						entries = [e for e in range(1, pcbnew.GetBoard().GetCopperLayerCount()+1)]
+						entry["choices"] = entries_str
+						entry["choices_data"] = entries
+
 				entry["wx_elem"] = self._make_choices(entry["label"], entry["choices"], entry["default"], entry["unit"])
 				self.Bind(wx.EVT_CHOICE, self._on_choice_change, entry["wx_elem"])
 				self.logger.log(logging.DEBUG, "[UI] Adding Choices")
@@ -187,7 +196,7 @@ class CoilGeneratorUI(wx.Frame):
 
 			val = None
 
-			if entry["type"] == "choices":
+			if entry["type"] == "choices" or entry["type"] == "choices_from_board":
 				val = entry["choices_data"][entry["wx_elem"].GetSelection()]
 			elif entry["type"] == "checkbox":
 				val = entry["wx_elem"].GetValue()
