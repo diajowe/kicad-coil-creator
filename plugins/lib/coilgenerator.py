@@ -18,6 +18,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
 
 import os
+import math
 from . import generator
 
 TEMPLATE_FILE = "../dynamic/template.kicad_mod"
@@ -38,27 +39,55 @@ def generate(LAYER_COUNT, WRAP_CLOCKWISE, N_TURNS, TRACE_WIDTH, TRACE_SPACING, V
 	lines = []
 	pads = []
 
+	VIA_INSIDE_RADIUS = OUTER_DIAMETER / 2 - N_TURNS * TRACE_WIDTH - (N_TURNS - 1) * TRACE_SPACING - VIA_DIAMETER - TRACE_WIDTH / 2
+	VIA_OUTSIDE_RADIUS = OUTER_DIAMETER / 2 + VIA_DIAMETER + TRACE_SPACING
+
+	num_vias_inside = 0
+	num_vias_outside = 0
+
+	if LAYER_COUNT -1 > 0:
+		num_vias_inside = (LAYER_COUNT -1) // 2
+		num_vias_outside = num_vias_inside
+		if (LAYER_COUNT -1) % 2 != 0:
+			num_vias_inside += 1
+
+
+		degree_steps_inside = 360 / (num_vias_inside)
+		degree_steps_outside = 0
+		if num_vias_outside != 0:
+			degree_steps_outside = 360 / (num_vias_outside)
+
+	# generating layer - 1 vias
+	for v in range(0, LAYER_COUNT-1):
+
+		# define if via is placed inside or outside of coil
+		via_used_radius = VIA_INSIDE_RADIUS
+		if v % 2 != 0:
+			via_used_radius = VIA_OUTSIDE_RADIUS
+
+		# set different step width for inside and outside loop
+		degree_steps_used = degree_steps_inside
+		if v % 2 != 0:
+			degree_steps_used = degree_steps_outside
+
+		rotation_degree = (v // 2) * degree_steps_used
+
+		height = math.sin(math.radians(rotation_degree)) * via_used_radius
+		width = math.sqrt(via_used_radius**2 - height**2)
+
+		if rotation_degree > 90 and rotation_degree < 270:
+			width *= -1
+
+		vias.append(
+			generator.via(
+				generator.P2D(width, height),
+				VIA_DIAMETER,
+				VIA_DRILL
+			)
+		)
+
 	current_radius = OUTER_DIAMETER / 2 - N_TURNS * TRACE_WIDTH - (N_TURNS - 1) * TRACE_SPACING
 
-	# place center via where it belongs
-	vias.append(
-		generator.via(
-			generator.P2D(current_radius - VIA_DIAMETER - TRACE_WIDTH / 2, 0),
-			VIA_DIAMETER,
-			VIA_DRILL)
-	)
-
-	if LAYER_COUNT > 2:
-		vias.append(generator.via(
-			generator.P2D(-current_radius + VIA_DIAMETER + TRACE_WIDTH / 2, 0),
-			VIA_DIAMETER,
-			VIA_DRILL
-		))
-		vias.append(generator.via(
-			generator.P2D(OUTER_DIAMETER / 2 + VIA_DIAMETER + TRACE_SPACING, 0),
-			VIA_DIAMETER,
-			VIA_DRILL
-		))
 
 	# build out arcs to spec, until # turns is reached
 	wrap_multiplier = 1 if WRAP_CLOCKWISE else -1
