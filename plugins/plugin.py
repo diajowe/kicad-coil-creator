@@ -245,6 +245,7 @@ class CoilGeneratorUI(wx.Frame):
 		self.Destroy()
 
 		self.logger.log(logging.INFO, "Generating coil ...")
+		layer_names = [pcbnew.GetBoard().GetLayerName(x) for x in range(pcbnew.GetBoard().GetCopperLayerCount())]
 
 		template = coilgenerator.generate(
 			self._parse_data("layer_count"),
@@ -255,7 +256,8 @@ class CoilGeneratorUI(wx.Frame):
 			self._parse_data("via_outer"),
 			self._parse_data("via_drill"),
 			self._parse_data("outer_diameter"),
-			self._parse_data("name")
+			self._parse_data("name"),
+			layer_names
 		)
 
 		self.logger.log(logging.INFO, "Done.")
