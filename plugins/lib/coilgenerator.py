@@ -24,6 +24,17 @@ from . import generator
 TEMPLATE_FILE = "../dynamic/template.kicad_mod"
 BREAKOUT_LEN = 0.5  # (mm)
 
+class Connector:
+	x: float
+	y: float
+	angle: float
+
+	def __init__(self, x, y, angle):
+		self.x = x
+		self.y = y
+		self.angle = angle
+		self
+
 def generate(layer_count, wrap_clockwise, turns_per_layer, trace_width, trace_spacing, via_diameter, via_drill, outer_diameter, coil_name, layer_names):
 	"""
 	Generates coils with given parameters. Attempts to place all parts to generate valid coils, though with some parameters, producing a valid coil might not be possible
@@ -41,78 +52,54 @@ def generate(layer_count, wrap_clockwise, turns_per_layer, trace_width, trace_sp
 	Returns:
 		File: Generated coil in file
 	"""
-	class Connector:
-		x: float
-		y: float
-		angle: float
-
-		def __init__(self, x, y, angle):
-			self.x = x
-			self.y = y
-			self.angle = angle
-			self
-
 	template_file = os.path.join(os.path.dirname(__file__), TEMPLATE_FILE)
 
 	with open(template_file, "r") as file:
 		template = file.read()
 
-	arcs = []
-	vias = []
-	lines = []
-	pads = []
+	# generate vias and their connectors
+	(vias, arc_connectors) = generate_vias(outer_diameter, turns_per_layer, trace_width, trace_spacing, via_diameter, via_drill, layer_count)
 
+	# generate coil spirals and connect them to vias
+	(arcs, lines, last_used_radius) = generate_coil_spiral(wrap_clockwise, layer_count, trace_width, trace_spacing, turns_per_layer, outer_diameter, layer_names, arc_connectors)
 
-	(VIA_INSIDE_RADIUS, VIA_OUTSIDE_RADIUS) = get_via_radius(outer_diameter, turns_per_layer, trace_width, trace_spacing, via_diameter)
+	# build coil endpoints
+	(lines, pads) = generate_pads(lines, last_used_radius, trace_width, via_diameter, wrap_clockwise, layer_count, layer_names[0], layer_names[layer_count -1])
 
-	#calculate the number of vias inside and outside of coil and their corresponding degree spacing
-	num_vias_inside = 0
-	num_vias_outside = 0
+	substitution_dict = {
+		"NAME": coil_name,
+		"LINES": ''.join(lines),
+		"ARCS": ''.join(arcs),
+		"VIAS": ''.join(vias),
+		"PADS": ''.join(pads),
+		"TIMESTAMP1": generator.tstamp(),
+		"TIMESTAMP2": generator.tstamp(),
+		"TIMESTAMP3": generator.tstamp(),
+	}
 
-	if layer_count -1 > 0:
-		(num_vias_inside, num_vias_outside) = get_num_vias(layer_count)
+	return template.format(**substitution_dict)
 
-		degree_steps_inside = 360 / (num_vias_inside)
-		degree_steps_outside = 0
-		if num_vias_outside != 0:
-			degree_steps_outside = 360 / (num_vias_outside)
+def generate_coil_spiral(wrap_clockwise, layer_count, trace_width, trace_spacing, turns_per_layer, outer_diameter, layer_names, arc_connectors):
+	"""
+	Generates coil spirals for a given coil and connects them to vias.
+	Args:
+		wrap_clockwise: Clockwise or counter-clockwise coil wrapping
+		layer_count: Number of layers in coil
+		trace_width: Width of line trace
+		trace_spacing: Distance between line traces
+		turns_per_layer: Minimum number of turns per layer: Connecting to vias might introduce up to one more turn
+		outer_diameter: Desires outer coil diameter. Coil generation is from outside to inside, so if this is too small, coil wraps may collode
+		layer_names: Names of Kicad layers to place coil in. Lenght is expected to be >= layer_count
+		arc_connectors: Via connector points to connect to
 
-	arc_connectors = []
-
-	# generating layer - 1 vias
-	for v in range(0, num_vias_inside + num_vias_outside):
-
-		# define if via is placed inside or outside of coil
-		via_used_radius = VIA_INSIDE_RADIUS
-		if v % 2 != 0:
-			via_used_radius = VIA_OUTSIDE_RADIUS
-
-		# set different step width for inside and outside loop
-		degree_steps_used = degree_steps_inside
-		if v % 2 != 0:
-			degree_steps_used = degree_steps_outside
-
-		rotation_degree = (v // 2) * degree_steps_used
-
-		height = math.sin(math.radians(rotation_degree)) * via_used_radius
-		width = math.sqrt(via_used_radius**2 - height**2)
-
-		if rotation_degree > 90 and rotation_degree < 270:
-			width *= -1
-
-		arc_connectors.append(Connector(width, height, rotation_degree))
-
-		vias.append(
-			generator.via(
-				generator.P2D(width, height),
-				via_diameter,
-				via_drill
-			)
-		)
-
+	Returns:
+		([str], [str], float): (Generated arcs for spirals for PCBNew, Generated connector lines for spirals to vias, last used radius in coil generation)
+	"""
 	# build out arcs to spec, until # turns is reached
 	wrap_direction_multiplier = 1 if wrap_clockwise else -1
 	increment = trace_width + trace_spacing
+	arcs = []
+	lines = []
 
 	start_radius = outer_diameter / 2 - turns_per_layer * trace_width - (turns_per_layer - 1) * trace_spacing
 	for layer in range(layer_count):
@@ -162,59 +149,146 @@ def generate(layer_count, wrap_clockwise, turns_per_layer, trace_width, trace_sp
 
 			(arcs, lines) = connect_via(end_point_radius, loop_end_point, increment, layer_names[layer], trace_width, first_via_inside, current_clockwise, arc_connectors[layer -1], arcs, lines)
 
-		if second_via_inside:
-			loop_end_point = loop_inner_point
-			end_point_radius = start_radius
-		else:
-			loop_end_point = loop_outer_point
-			end_point_radius = current_radius
+		if layer < (layer_count -1) or (layer_count % 2 != 0):
+			if second_via_inside:
+				loop_end_point = loop_inner_point
+				end_point_radius = start_radius
+			else:
+				loop_end_point = loop_outer_point
+				end_point_radius = current_radius
 
-		(arcs, lines) = connect_via(end_point_radius, loop_end_point, increment, layer_names[layer], trace_width, second_via_inside, current_clockwise, arc_connectors[layer], arcs, lines)
+			(arcs, lines) = connect_via(end_point_radius, loop_end_point, increment, layer_names[layer], trace_width, second_via_inside, current_clockwise, arc_connectors[layer], arcs, lines)
 
-	top_pad_center_point = generator.P2D(current_radius + BREAKOUT_LEN + 4 * trace_width, (BREAKOUT_LEN + 0.5 * via_diameter) * -wrap_direction_multiplier)
-	bottom_pad_center_point = generator.P2D(current_radius + BREAKOUT_LEN + 4 * trace_width, (BREAKOUT_LEN + 0.5 * via_diameter)* wrap_direction_multiplier)
+	return (arcs, lines, current_radius)
 
-	# draw breakout line(s)
 
+def generate_vias(outer_diameter, turns_per_layer, trace_width, trace_spacing, via_diameter, via_drill, layer_count):
+	"""
+	Generates vias for a given coil.
+	Connection has to be done when coil spirals have been generated
+	Args:
+		outer_diameter: Desired outer coil diameter
+		turns_per_layer: Number of spiral turns per coil layer
+		trace_width: Width of line trace
+		trace_spacing: Distance between line traces
+		via_diameter: Outer diameter of connecting vias
+		via_drill: Diameter of via drill hole
+		layer_count: Number of layers in coil
+
+	Returns:
+		([str], [Connector]): (Generated vias for PCBNew, Via positions to be used for easier connecting with coil spiral)
+	"""
+	(VIA_INSIDE_RADIUS, VIA_OUTSIDE_RADIUS) = get_via_radius(outer_diameter, turns_per_layer, trace_width, trace_spacing, via_diameter)
+	arc_connectors = []
+	vias = []
+
+	#calculate the number of vias inside and outside of coil and their corresponding degree spacing
+	num_vias_inside = 0
+	num_vias_outside = 0
+
+	(num_vias_inside, num_vias_outside) = get_num_vias(layer_count)
+
+	degree_steps_inside = 360 / (num_vias_inside)
+	degree_steps_outside = 0
+	if num_vias_outside != 0:
+		degree_steps_outside = 360 / (num_vias_outside)
+
+	for v in range(0, num_vias_inside + num_vias_outside):
+
+		# define if via is placed inside or outside of coil
+		via_used_radius = VIA_INSIDE_RADIUS
+		if v % 2 != 0:
+			via_used_radius = VIA_OUTSIDE_RADIUS
+
+		# set different step width for inside and outside loop
+		degree_steps_used = degree_steps_inside
+		if v % 2 != 0:
+			degree_steps_used = degree_steps_outside
+
+		rotation_degree = (v // 2) * degree_steps_used
+
+		height = math.sin(math.radians(rotation_degree)) * via_used_radius
+		width = math.sqrt(via_used_radius**2 - height**2)
+
+		if rotation_degree > 90 and rotation_degree < 270:
+			width *= -1
+
+		arc_connectors.append(Connector(width, height, rotation_degree))
+
+		vias.append(
+			generator.via(
+				generator.P2D(width, height),
+				via_diameter,
+				via_drill
+			)
+		)
+
+	return (vias, arc_connectors)
+
+def generate_pads(lines, outer_radius, trace_width, via_diameter, clockwise, layer_count, top_layer_name, bottom_layer_name):
+	"""
+	Generates and connects pads for a given coil.
+	Coils with uneven number of layers will only have one pad, as the other connection is a via on the inside of the coil
+	Args:
+		lines: previously drawn lines array to manipulate / append
+		outer_radius: Desired outer coil radius
+		trace_width: Width of line trace
+		via_diameter: Outer diameter of connecting vias
+		clockwise: Clockwise or counter-clockwise coil wrapping
+		layer_count: Number of layers in coil
+		top_layer_name: PCBNew name of top coil layer
+		bottom_layer_name: PCBNew name of bottom coil layer (not necessarily PCB bottom layer!)
+
+	Returns:
+		([str], [str]): (Modified lines array, Generated Pads array)
+	"""
+	pads = []
+	wrap_direction_multiplier = 1 if clockwise else -1
+
+	#calculate pad center points
+	top_pad_center_point = generator.P2D(outer_radius + BREAKOUT_LEN + 4 * trace_width, (BREAKOUT_LEN + 0.5 * via_diameter) * -wrap_direction_multiplier)
+	bottom_pad_center_point = generator.P2D(outer_radius + BREAKOUT_LEN + 4 * trace_width, (BREAKOUT_LEN + 0.5 * via_diameter)* wrap_direction_multiplier)
+
+	# draw lines from coil spiral end point to top pad
 	lines.append(
 		generator.line(
-			generator.P2D(current_radius, 0),
-			generator.P2D(current_radius, top_pad_center_point.y),
+			generator.P2D(outer_radius, 0),
+			generator.P2D(outer_radius, top_pad_center_point.y),
 			trace_width,
-			layer_names[0]
+			top_layer_name
 		)
 	)
 
 	lines.append(
 		generator.line(
-			generator.P2D(current_radius, top_pad_center_point.y),
+			generator.P2D(outer_radius, top_pad_center_point.y),
 			top_pad_center_point,
 			trace_width,
-			layer_names[0]
+			top_layer_name
 		)
 	)
 
+	# if bottom pad exists, draw lines from spiral end point to bottom pad
 	if layer_count > 1 and layer_count % 2 == 0:
 		lines.append(
 			generator.line(
-				generator.P2D(current_radius, 0),
-				generator.P2D(current_radius, bottom_pad_center_point.y),
+				generator.P2D(outer_radius, 0),
+				generator.P2D(outer_radius, bottom_pad_center_point.y),
 				trace_width,
-				layer_names[layer_count -1]
+				bottom_layer_name
 			)
 		)
 
 		lines.append(
 			generator.line(
-				generator.P2D(current_radius, bottom_pad_center_point.y),
+				generator.P2D(outer_radius, bottom_pad_center_point.y),
 				bottom_pad_center_point,
 				trace_width,
-				layer_names[layer_count -1]
+				bottom_layer_name
 			)
 		)
 
-	# connect to pads
-
+	# generate the pads
 	# NOTE: there are some oddities in KiCAD here. The pad must be sufficiently far away from the last line such that
 	# KiCAD does not display the "Cannot start routing from a graphic" error. It also must be far enough away that the
 	# trace does not throw the "The routing start point violates DRC error". I have found that a 0.5mm gap works ok in
@@ -225,7 +299,7 @@ def generate(layer_count, wrap_clockwise, turns_per_layer, trace_width, trace_sp
 			top_pad_center_point,
 			8 * trace_width,
 			trace_width,
-			layer_names[0]
+			top_layer_name
 		)
 	)
 
@@ -236,22 +310,11 @@ def generate(layer_count, wrap_clockwise, turns_per_layer, trace_width, trace_sp
 				bottom_pad_center_point,
 				8 * trace_width,
 				trace_width,
-				layer_names[layer_count -1]
+				bottom_layer_name
 			)
 		)
 
-	substitution_dict = {
-		"NAME": coil_name,
-		"LINES": ''.join(lines),
-		"ARCS": ''.join(arcs),
-		"VIAS": ''.join(vias),
-		"PADS": ''.join(pads),
-		"TIMESTAMP1": generator.tstamp(),
-		"TIMESTAMP2": generator.tstamp(),
-		"TIMESTAMP3": generator.tstamp(),
-	}
-
-	return template.format(**substitution_dict)
+	return (lines, pads)
 
 def get_num_vias(layer_count):
 	"""
@@ -263,7 +326,7 @@ def get_num_vias(layer_count):
 		(float, float): (Via inside of coil, Via outside of coil)
 	"""
 	#coils with uneven layer count need extra via that allows connection of last endpoint of coil
-	num_vias = layer_count - layer_count % 2
+	num_vias = layer_count - (1- layer_count % 2)
 	num_vias_inside = num_vias // 2 + 1
 	num_vias_outside = num_vias_inside - 1
 
@@ -273,7 +336,7 @@ def get_via_radius(outer_diameter, turns_per_layer, trace_width, trace_spacing, 
 	"""
 	Calculates diameter at which vias need to be placed
 	Args:
-		outer_diameter: Desires outer coil diameter. Coil generation is from outside to inside, so if this is too small, coil wraps may collode
+		outer_diameter: Desired outer coil diameter. Coil generation is from outside to inside, so if this is too small, coil wraps may collide
 		turns_per_layer: Minimum number of turns per layer: Connecting to vias might introduce up to one more turn
 		trace_width: Width of line trace
 		trace_spacing: Distance between line traces
