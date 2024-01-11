@@ -80,7 +80,7 @@ def generate(layer_count, wrap_clockwise, turns_per_layer, trace_width, trace_sp
 	arc_connectors = []
 
 	# generating layer - 1 vias
-	for v in range(0, layer_count-1):
+	for v in range(0, num_vias_inside + num_vias_outside):
 
 		# define if via is placed inside or outside of coil
 		via_used_radius = VIA_INSIDE_RADIUS
@@ -151,7 +151,7 @@ def generate(layer_count, wrap_clockwise, turns_per_layer, trace_width, trace_sp
 		loop_inner_point = generator.P2D(start_radius, 0)
 		loop_outer_point = generator.P2D(current_radius, 0)
 
-		# connect up to two vias, or one for first and last layer
+		# connect up to two vias, or one for first layer
 		if layer > 0:
 			if first_via_inside:
 				loop_end_point = loop_inner_point
@@ -162,15 +162,14 @@ def generate(layer_count, wrap_clockwise, turns_per_layer, trace_width, trace_sp
 
 			(arcs, lines) = connect_via(end_point_radius, loop_end_point, increment, layer_names[layer], trace_width, first_via_inside, current_clockwise, arc_connectors[layer -1], arcs, lines)
 
-		if layer < layer_count -1:
-			if second_via_inside:
-				loop_end_point = loop_inner_point
-				end_point_radius = start_radius
-			else:
-				loop_end_point = loop_outer_point
-				end_point_radius = current_radius
+		if second_via_inside:
+			loop_end_point = loop_inner_point
+			end_point_radius = start_radius
+		else:
+			loop_end_point = loop_outer_point
+			end_point_radius = current_radius
 
-			(arcs, lines) = connect_via(end_point_radius, loop_end_point, increment, layer_names[layer], trace_width, second_via_inside, current_clockwise, arc_connectors[layer], arcs, lines)
+		(arcs, lines) = connect_via(end_point_radius, loop_end_point, increment, layer_names[layer], trace_width, second_via_inside, current_clockwise, arc_connectors[layer], arcs, lines)
 
 	top_pad_center_point = generator.P2D(current_radius + BREAKOUT_LEN + 4 * trace_width, (BREAKOUT_LEN + 0.5 * via_diameter) * -wrap_direction_multiplier)
 	bottom_pad_center_point = generator.P2D(current_radius + BREAKOUT_LEN + 4 * trace_width, (BREAKOUT_LEN + 0.5 * via_diameter)* wrap_direction_multiplier)
@@ -195,7 +194,7 @@ def generate(layer_count, wrap_clockwise, turns_per_layer, trace_width, trace_sp
 		)
 	)
 
-	if layer_count > 1:
+	if layer_count > 1 and layer_count % 2 == 0:
 		lines.append(
 			generator.line(
 				generator.P2D(current_radius, 0),
@@ -230,7 +229,7 @@ def generate(layer_count, wrap_clockwise, turns_per_layer, trace_width, trace_sp
 		)
 	)
 
-	if layer_count > 1:
+	if layer_count > 1 and layer_count % 2 == 0:
 		pads.append(
 			generator.pad(
 				2,
@@ -263,10 +262,10 @@ def get_num_vias(layer_count):
 	Returns:
 		(float, float): (Via inside of coil, Via outside of coil)
 	"""
-	num_vias_inside = (layer_count -1) // 2
-	num_vias_outside = num_vias_inside
-	if (layer_count -1) % 2 != 0:
-		num_vias_inside += 1
+	#coils with uneven layer count need extra via that allows connection of last endpoint of coil
+	num_vias = layer_count - layer_count % 2
+	num_vias_inside = num_vias // 2 + 1
+	num_vias_outside = num_vias_inside - 1
 
 	return (num_vias_inside, num_vias_outside)
 
