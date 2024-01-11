@@ -62,8 +62,8 @@ def generate(layer_count, wrap_clockwise, turns_per_layer, trace_width, trace_sp
 	lines = []
 	pads = []
 
-	VIA_INSIDE_RADIUS = outer_diameter / 2 - turns_per_layer * trace_width - (turns_per_layer + 2) * trace_spacing - via_diameter - trace_width / 2
-	VIA_OUTSIDE_RADIUS = outer_diameter / 2 + via_diameter + trace_spacing + trace_spacing + trace_width
+	VIA_INSIDE_RADIUS = outer_diameter / 2 - turns_per_layer * trace_width - (turns_per_layer -1) * trace_spacing - via_diameter - (trace_width + trace_spacing)
+	VIA_OUTSIDE_RADIUS = outer_diameter / 2 + via_diameter + 2 * trace_spacing + trace_width
 
 	#calculate the number of vias inside and outside of coil and their corresponding degree spacing
 	num_vias_inside = 0
