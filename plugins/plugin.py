@@ -1,6 +1,7 @@
 import os
 import logging
 import json
+import math
 
 import wx # type: ignore
 import pcbnew # type: ignore
@@ -80,19 +81,26 @@ class CoilGeneratorUI(wx.Frame):
 
 			self.logger.log(logging.DEBUG, entry)
 
-		elem_button_generate = wx.Button(self, label="Generate Coil")
-		elem_button_generate.Bind(wx.EVT_BUTTON, self._on_generate_button_klick)
+		self.notes = self._make_label(label="")
+		self.notes.SetForegroundColour((255, 0, 0, 255))
+		self.logger.log(logging.DEBUG, "[UI] Adding Label")
 
-		elem_button_save = wx.Button(self, label="Save as Project Footprint")
-		elem_button_save.Bind(wx.EVT_BUTTON, self._on_save_button_klick)
+		self.elem_button_generate = wx.Button(self, label="Generate Coil")
+		self.elem_button_generate.Bind(wx.EVT_BUTTON, self._on_generate_button_klick)
 
-		self.sizer_box.Add(elem_button_generate, 0, wx.ALL, self.padding)
-		self.sizer_box.Add(elem_button_save, 0, wx.ALL, self.padding)
+		self.elem_button_save = wx.Button(self, label="Save as Project Footprint")
+		self.elem_button_save.Bind(wx.EVT_BUTTON, self._on_save_button_klick)
+
+
+		self.sizer_box.Add(self.elem_button_generate, 0, wx.ALL, self.padding)
+		self.sizer_box.Add(self.elem_button_save, 0, wx.ALL, self.padding)
 
 		self.SetSizer(self.sizer_box)
 		self.Layout()
 		self.sizer_box.Fit(self)
 		self.Centre(wx.BOTH)
+
+		self.update_coil_generation_notes()
 
 	def _on_choice_change(self, event):
 		identifier = ""
@@ -101,6 +109,7 @@ class CoilGeneratorUI(wx.Frame):
 			if entry["wx_elem"] == event.GetEventObject():
 				identifier = entry["id"]
 
+		self.update_coil_generation_notes()
 		self._update_cached_setting(identifier, event.GetEventObject().GetSelection())
 
 	def _on_value_change(self, event):
@@ -110,6 +119,7 @@ class CoilGeneratorUI(wx.Frame):
 			if entry["wx_elem"] == event.GetEventObject():
 				identifier = entry["id"]
 
+		self.update_coil_generation_notes()
 		self._update_cached_setting(identifier, event.GetEventObject().GetValue())
 
 	def _make_choices(self, label, choices, default = 0, unit = None):
@@ -153,6 +163,12 @@ class CoilGeneratorUI(wx.Frame):
 		)
 
 		return elem_slider
+
+	def _make_label(self, label):
+		elem_label = wx.StaticText(self, label=label)
+		self.sizer_box.Add(elem_label, 0, wx.ALL, self.padding)
+
+		return elem_label
 
 	def _make_textbox(self, label, default = 0, unit = None):
 		elem_label = wx.StaticText(self, label=label)
@@ -381,6 +397,65 @@ class CoilGeneratorUI(wx.Frame):
 		handler.setFormatter(formatter)
 
 		root.addHandler(handler)
+
+	def update_coil_generation_notes(self):
+		"""
+		Checks if a coil is generatable and places notes on form / generation errors.
+		To be called on form value changes
+		"""
+		try:
+			self.elem_button_generate.Enable()
+			self.elem_button_save.Enable()
+			if not self.estimate_is_coil_generatable(
+				self._parse_data("outer_diameter"),
+				self._parse_data("turns_count"),
+				self._parse_data("trace_width"),
+				self._parse_data("trace_spacing"),
+				self._parse_data("via_outer"),
+				self._parse_data("layer_count")
+				):
+				self.notes.SetLabel("WARNING: This coil MAY not be generatable.")
+			else:
+				self.notes.SetLabel("")
+		except:
+			self.notes.SetLabel("One or more entries contain invalid values")
+			self.elem_button_generate.Disable()
+			self.elem_button_save.Disable()
+
+	def estimate_is_coil_generatable(self, outer_diameter, turns_per_layer, trace_width, trace_spacing, via_diameter, layer_count):
+		"""
+		Checks if a coil is generatable.
+		If this returns true, the coil is likely to be fault free.
+		If this return false, the coil is likely to be faulty.
+		Checks are ESTIMATES only
+		Checks this by checking inner via placement
+		Args:
+			outer_diameter: Desires outer coil diameter. Coil generation is from outside to inside, so if this is too small, coil wraps may collode
+			turns_per_layer: Minimum number of turns per layer: Connecting to vias might introduce up to one more turn
+			trace_width: Width of line trace
+			trace_spacing: Distance between line traces
+			via_diameter: Outer diameter of connecting vias
+			layer_count: Number of layers in coil
+
+		Returns:
+			Bool: False, if coil is definitely not generatable, True, if coil MAY be generatable
+		"""
+		(via_inner_diameter, _) = coilgenerator.get_via_radius(outer_diameter, turns_per_layer, trace_width, trace_spacing, via_diameter)
+
+		# if via diameter is negative, then coil spiral traces are overlapping in one layer, even without considering vias
+		if via_inner_diameter <= 0:
+			return False
+
+		# check if inner vias fit on radius
+		(num_vias_inside, _) = coilgenerator.get_num_vias(layer_count)
+
+		circumference = 2 * math.pi * (via_inner_diameter / 2)
+
+		# using trace width as minimum distance between vias, a ROUGH ESTIMATE can be made if the vias fit on the chosen circle
+		if circumference - num_vias_inside * (via_diameter + trace_width) < 0:
+			return False
+
+		return True
 
 def get_safe_name(name, keepcharacters = (' ','.','_')):
     return "".join(c for c in name if c.isalnum() or c in keepcharacters).rstrip()

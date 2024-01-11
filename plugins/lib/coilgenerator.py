@@ -62,19 +62,15 @@ def generate(layer_count, wrap_clockwise, turns_per_layer, trace_width, trace_sp
 	lines = []
 	pads = []
 
-	VIA_INSIDE_RADIUS = outer_diameter / 2 - turns_per_layer * trace_width - (turns_per_layer -1) * trace_spacing - via_diameter - (trace_width + trace_spacing)
-	VIA_OUTSIDE_RADIUS = outer_diameter / 2 + via_diameter + 2 * trace_spacing + trace_width
+
+	(VIA_INSIDE_RADIUS, VIA_OUTSIDE_RADIUS) = get_via_radius(outer_diameter, turns_per_layer, trace_width, trace_spacing, via_diameter)
 
 	#calculate the number of vias inside and outside of coil and their corresponding degree spacing
 	num_vias_inside = 0
 	num_vias_outside = 0
 
 	if layer_count -1 > 0:
-		num_vias_inside = (layer_count -1) // 2
-		num_vias_outside = num_vias_inside
-		if (layer_count -1) % 2 != 0:
-			num_vias_inside += 1
-
+		(num_vias_inside, num_vias_outside) = get_num_vias(layer_count)
 
 		degree_steps_inside = 360 / (num_vias_inside)
 		degree_steps_outside = 0
@@ -257,6 +253,41 @@ def generate(layer_count, wrap_clockwise, turns_per_layer, trace_width, trace_sp
 	}
 
 	return template.format(**substitution_dict)
+
+def get_num_vias(layer_count):
+	"""
+	Calculates number of vias required inside and outside of coil
+	Args:
+		layer_count: Number of layers in coil
+
+	Returns:
+		(float, float): (Via inside of coil, Via outside of coil)
+	"""
+	num_vias_inside = (layer_count -1) // 2
+	num_vias_outside = num_vias_inside
+	if (layer_count -1) % 2 != 0:
+		num_vias_inside += 1
+
+	return (num_vias_inside, num_vias_outside)
+
+def get_via_radius(outer_diameter, turns_per_layer, trace_width, trace_spacing, via_diameter):
+	"""
+	Calculates diameter at which vias need to be placed
+	Args:
+		outer_diameter: Desires outer coil diameter. Coil generation is from outside to inside, so if this is too small, coil wraps may collode
+		turns_per_layer: Minimum number of turns per layer: Connecting to vias might introduce up to one more turn
+		trace_width: Width of line trace
+		trace_spacing: Distance between line traces
+		via_diameter: Outer diameter of connecting vias
+
+	Returns:
+		(float, float): (Via inside radius, Via outside radius)
+	"""
+	VIA_INSIDE_RADIUS = outer_diameter / 2 - turns_per_layer * trace_width - (turns_per_layer -1) * trace_spacing - via_diameter - (trace_width + trace_spacing)
+	VIA_OUTSIDE_RADIUS = outer_diameter / 2 + via_diameter + 2 * trace_spacing + trace_width
+
+	return (VIA_INSIDE_RADIUS, VIA_OUTSIDE_RADIUS)
+
 
 def get_circle_section_centerpoint(point_a, point_b, radius):
 	"""
