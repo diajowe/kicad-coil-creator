@@ -406,7 +406,10 @@ class CoilGeneratorUI(wx.Frame):
 		try:
 			self.elem_button_generate.Enable()
 			self.elem_button_save.Enable()
-			if not self.estimate_is_coil_generatable(
+
+			if self._parse_data("via_outer") < self._parse_data("via_drill"):
+				self.notes.SetLabel("WARNING: Via drill is greater than outer diameter")
+			elif not self.estimate_is_coil_generatable(
 				self._parse_data("outer_diameter"),
 				self._parse_data("turns_count"),
 				self._parse_data("trace_width"),
