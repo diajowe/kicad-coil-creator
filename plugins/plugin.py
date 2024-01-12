@@ -262,6 +262,8 @@ class CoilGeneratorUI(wx.Frame):
 
 		self.logger.log(logging.INFO, "Generating coil ...")
 		layer_names = [pcbnew.GetBoard().GetLayerName(x) for x in range(pcbnew.GetBoard().GetCopperLayerCount())]
+		# last layer in layer list should always be B.Cu, but if board layer count != max_layer_count, pcbnew reports InX.Cu as last layer name
+		layer_names[pcbnew.GetBoard().GetCopperLayerCount() -1] = "B.Cu"
 
 		template = coilgenerator.generate(
 			self._parse_data("layer_count"),
