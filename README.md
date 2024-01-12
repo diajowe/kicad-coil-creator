@@ -25,8 +25,6 @@ _(Footprint automatically exported can be viewed in the footprint editor)_
 
 ## Future Goals
 
-- [ ] Rewrite of the generator code, as it is currently based on a two layer implementation that was only extended for 4 layers
-- [ ] Add more layer support
 - [ ] Add support for stretched coils
 - [ ] Add support for rectangular coils
 - [ ] Display coil statistics in the UI, [similar to TI's implementation](https://webench.ti.com/wb5/LDC)
