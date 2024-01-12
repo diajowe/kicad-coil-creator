@@ -262,7 +262,7 @@ def generate_pads(lines, outer_radius, trace_width, via_diameter, clockwise, lay
 	lines.append(
 		generator.line(
 			generator.P2D(outer_radius, top_pad_center_point.y),
-			top_pad_center_point,
+			generator.P2D(top_pad_center_point.x - 3 * trace_width, top_pad_center_point.y),
 			trace_width,
 			top_layer_name
 		)
@@ -282,7 +282,7 @@ def generate_pads(lines, outer_radius, trace_width, via_diameter, clockwise, lay
 		lines.append(
 			generator.line(
 				generator.P2D(outer_radius, bottom_pad_center_point.y),
-				bottom_pad_center_point,
+				generator.P2D(bottom_pad_center_point.x - 3 * trace_width, bottom_pad_center_point.y),
 				trace_width,
 				bottom_layer_name
 			)
