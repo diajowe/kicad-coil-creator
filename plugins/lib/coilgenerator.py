@@ -246,8 +246,8 @@ def generate_pads(lines, outer_radius, trace_width, via_diameter, clockwise, lay
 	wrap_direction_multiplier = 1 if clockwise else -1
 
 	#calculate pad center points
-	top_pad_center_point = generator.P2D(outer_radius + BREAKOUT_LEN + 4 * trace_width, (BREAKOUT_LEN + 0.5 * via_diameter) * -wrap_direction_multiplier)
-	bottom_pad_center_point = generator.P2D(outer_radius + BREAKOUT_LEN + 4 * trace_width, (BREAKOUT_LEN + 0.5 * via_diameter)* wrap_direction_multiplier)
+	top_pad_center_point = generator.P2D(outer_radius + BREAKOUT_LEN + 4 * trace_width, (BREAKOUT_LEN + 0.5 * via_diameter + trace_width) * -wrap_direction_multiplier)
+	bottom_pad_center_point = generator.P2D(outer_radius + BREAKOUT_LEN + 4 * trace_width, (BREAKOUT_LEN + 0.5 * via_diameter + trace_width)* wrap_direction_multiplier)
 
 	# draw lines from coil spiral end point to top pad
 	lines.append(
