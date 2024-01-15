@@ -8,13 +8,12 @@ structure = [
 		"unit" : None
 	},{
         "id" : "layer_count",
-		"type" : "choices",
+		"type" : "choices_from_board",
 		"label" : "layer count",
-		"choices" : ["1 layer", "2 layers", "4 layers"],
-        "choices_data" : [1, 2, 4],
-		"default" : 0,
+        "choices_source" : "COPPER_LAYER_COUNT",
+        "default" : 1,
         "datatype" : "int",
-		"unit" : None
+		"unit" : "layer"
 	},{
         "id" : "turns_count",
 		"type" : "text",
