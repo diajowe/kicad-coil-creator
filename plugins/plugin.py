@@ -365,11 +365,8 @@ class CoilGeneratorUI(wx.Frame):
 			evt.SetKeyCode(ord('V'))
 			evt.SetControlDown(True)
 			self.logger.log(logging.INFO, "Using wx.KeyEvent for paste")
-	
-			wnd = [i for i in self._pcbnew_frame.Children if i.ClassName == 'wxWindow'][0]
-
-			self.logger.log(logging.INFO, "Injecting event: {} into window: {}".format(evt, wnd))
-			wx.PostEvent(wnd, evt)
+		
+			wx.PostEvent(self._pcbnew_frame, evt)
 		except:
 			# Likely on Linux with old wx python support :(
 			self.logger.log(logging.INFO, "Using wx.UIActionSimulator for paste")
