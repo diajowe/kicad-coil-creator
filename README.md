@@ -28,3 +28,5 @@ _(Footprint automatically exported can be viewed in the footprint editor)_
 - [ ] Add support for stretched coils
 - [ ] Add support for rectangular coils
 - [ ] Display coil statistics in the UI, [similar to TI's implementation](https://webench.ti.com/wb5/LDC)
+  - Math: https://coil32.net/pcb-coil.html
+  
