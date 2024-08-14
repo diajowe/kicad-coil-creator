@@ -1,3 +1,5 @@
+<img align="right" width="175px" src="assets/logo.svg">
+
 # PCB Coil Generator
 
 ## Features
