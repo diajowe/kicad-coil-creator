@@ -1,4 +1,4 @@
-<img align="right" width="175px" src="assets/logo.svg">
+<img align="right" width="60px" src="assets/logo.svg">
 
 # PCB Coil Generator
 
