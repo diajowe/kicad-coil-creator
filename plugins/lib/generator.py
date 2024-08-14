@@ -44,7 +44,7 @@ def via(loc: P2D, diameter: float, drill: float) -> str:
 	Returns:
 		str: the via, formatted for use in the footprint file
 	"""
-	via = f'  (pad "" thru_hole circle (at {loc}) (size {diameter} {diameter}) (drill {drill}) (layers *.Cu *.Mask) ({tstamp()}))\n'
+	via = f'  (pad "" thru_hole circle (at {loc}) (size {diameter} {diameter}) (drill {drill}) (layers *.Cu) ({tstamp()}))\n'
 	return via
 
 
