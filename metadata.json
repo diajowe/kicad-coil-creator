@@ -1,18 +1,18 @@
 {
     "$schema": "https://go.kicad.org/pcm/schemas/v1",
     "name": "PCB Coil Generator",
-    "description": "Generates PCB coils for KiCad",
-    "description_full": "Toolkit for generating PCB coils from within KiCad and using them as footprints.\n\nAll pramaters can be set from within a UI that can be found in the action toolbar.",
+    "description": "Generates multilayer PCB coils for direct placement or as a footprint",
+    "description_full": "The PCB Coil Creator is an addon that allows you to generate multilayer PCB coils directly within KiCad. It features a UI for configuring parameters like layer count, trace width, and coil dimensions.\n\nThe generated coils can be used as footprints or embedded directly into board designs, making it a versatile tool for various PCB projects.",
     "identifier": "com.github.DIaLOGIKa-GmbH.kicad-coil-creator",
     "type": "plugin",
     "author": {
-        "name": "Tim Goll, DIaLOGIKa",
+        "name": "Tim Goll & Jonas Wenner, DIaLOGIKa GmbH",
         "contact": {
             "web": "https://github.com/DIaLOGIKa-GmbH"
         }
     },
     "maintainer": {
-        "name": "Tim Goll, DIaLOGIKa",
+        "name": "Tim Goll & Jonas Wenner, DIaLOGIKa GmbH",
         "contact": {
             "web": "https://github.com/DIaLOGIKa-GmbH"
         }
@@ -31,6 +31,16 @@
             "version": "1.0.0",
             "status": "stable",
             "kicad_version": "7.00"
+        },
+        {
+            "version": "2.0.0",
+            "status": "stable",
+            "kicad_version": "8.00"
+        },
+        {
+            "version": "2.1.0",
+            "status": "stable",
+            "kicad_version": "8.00"
         }
     ]
 }
