@@ -1,8 +1,8 @@
 try:
-	from .plugin import Plugin
-	plugin = Plugin()
-	plugin.register()
+    from .plugin import Plugin
+    plugin = Plugin()
+    plugin.register()
 except Exception as e:
-	import logging
-	logger = logging.getLogger()
-	logger.debug(repr(e))
+    import logging
+    logger = logging.getLogger()
+    logger.debug(repr(e))
