@@ -3,3 +3,4 @@
 *.log
 *lastconfig.json
 *.pylintrc
+*.vscode/
