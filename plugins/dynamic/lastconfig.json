@@ -1,3 +1,11 @@
 {
-    "layer_count": 19
+    "turn_direction": 1,
+    "layer_count": 30,
+    "name": "blubb",
+    "turns_count": "10",
+    "outer_diameter": "12",
+    "trace_width": "0.100",
+    "trace_spacing": "0.200",
+    "via_outer": "0.6",
+    "via_drill": "0.3"
 }
