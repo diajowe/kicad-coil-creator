@@ -17,8 +17,9 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
 
-from .rounded_coil import RoundedCoil
+from .circular_coil import CircularCoil
 from .helper_classes import Layer
+# todo: this import is kinda wonky
 from .footprint import Footprint
 
 # todo: finish, add proper docu
@@ -40,7 +41,7 @@ def generate(layer_count, rotation_direction, turns_per_layer, trace_width, trac
             File: Generated coil in file
     """
 
-    coil = RoundedCoil(
+    coil = CircularCoil(
         outer_diameter,
         rotation_direction,
         layer_names[:layer_count],

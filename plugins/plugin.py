@@ -559,17 +559,27 @@ def get_safe_name(name, keepcharacters=(' ', '.', '_')):
 
 class Plugin(pcbnew.ActionPlugin):
     def __init__(self):
-        self.name = "Coil Generator"
-        self.category = "Manufacturing"
-        self.description = "Toolkit to automatically generate coils for KiCad"
-        self.pcbnew_icon_support = hasattr(self, "show_toolbar_button")
-        self.show_toolbar_button = True
-        self.icon_file_name = os.path.join(
-            os.path.dirname(__file__), 'icon.png')
-        self.dark_icon_file_name = os.path.join(
-            os.path.dirname(__file__), 'icon.png')
+        try:
+            self.name = "Coil Generator"
+            self.category = "Manufacturing"
+            self.description = "Toolkit to automatically generate coils for KiCad"
+            self.pcbnew_icon_support = hasattr(self, "show_toolbar_button")
+            self.show_toolbar_button = True
+            self.icon_file_name = os.path.join(
+                os.path.dirname(__file__), 'icon.png')
+            self.dark_icon_file_name = os.path.join(
+                os.path.dirname(__file__), 'icon.png')
+        except Exception as e:
+            logger = logging.getLogger()
+            logger.debug(repr(e))
+            logger.debug(traceback.format_exc())
 
     def Run(self):
+        try:
         # Assuming the PCBNew window is focused when run function is executed
         # Alternative would be to keep track of last focussed window, which does not seem to work on all systems
-        CoilGeneratorUI(wx.Window.FindFocus()).Show()
+            CoilGeneratorUI(wx.Window.FindFocus()).Show()
+        except Exception as e:
+            logger = logging.getLogger()
+            logger.debug(repr(e))
+            logger.debug(traceback.format_exc())

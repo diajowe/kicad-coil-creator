@@ -17,32 +17,24 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 -----------------------------------------------------------------
 
-This file is intended to store structures to generate rounded coil.
+This file is intended to store the main structure to generate circular coils.
 """
 
-
+# todo: is deepcopy needed
 from copy import deepcopy
 
-from .rounded_coil_objects import (
-    LayerSpiral,
-    OutsideTraceConnector,
-    TraceInterConnector,
-    ViaRingCount,
-    ViaRingRadius,
-    ViaRings
-)
-from .helper_classes import (
-    ErrorMessages,
-    Layer,
-    PadConfig,
-    RotationDirection,
-    SpiralPosition,
-    TraceConfig,
-    ViaConfig
-)
-from .legacy_kicad_interface import KicadLegacyInterface
+from .external_geometry_connector import ExternalGeometryConnector
+from .layer_spiral import LayerSpiral
+from .trace_inter_connector import TraceInterConnector
+from .via_rings import ViaRingCount, ViaRingRadius, ViaRings
 
-class RoundedCoil(KicadLegacyInterface):
+from ..exceptions import InvalidLengthException
+from ..footprint_objects.trace import TraceConfig
+from ..footprint_objects.via import ViaConfig, PadConfig
+from ..helper_classes import Layer, RotationDirection, SpiralPosition
+from ..legacy_kicad_interface import KicadLegacyInterface
+
+class CircularCoil(KicadLegacyInterface):
     """
     Generates round coils
     """
@@ -63,7 +55,7 @@ class RoundedCoil(KicadLegacyInterface):
         via_drill_diameter_mm: float,
     ):
         """
-        Generates rounded coil according to given parameter.
+        Generates circular coil according to given parameter.
         Does not guarantee that a coil with given parameter will be properly manufacturable
         :param coil_outer_diameter_mm: Outer diameter of coil, in mm, if coil were perfectly round
         :param rotation_direction: Marks turn direction of coil sprials
@@ -76,19 +68,19 @@ class RoundedCoil(KicadLegacyInterface):
         """
         # todo : do not raise those on your own, have config objects do that
         if coil_outer_diameter_mm <= 0:
-            raise ValueError(ErrorMessages.COIL_OUTER_DIAMETER_NOT_POSITIVE)
+            raise InvalidLengthException(coil_outer_diameter_mm)
         if via_outer_diameter_mm <= 0:
-            raise ValueError(ErrorMessages.VIA_DIAMETER_NOT_POSITIVE)
+            raise InvalidLengthException(via_outer_diameter_mm)
         if via_drill_diameter_mm <= 0:
-            raise ValueError(ErrorMessages.VIA_DRILL_NOT_POSITIVE)
+            raise InvalidLengthException(via_drill_diameter_mm)
         if len(coil_layers) <= 0:
-            raise ValueError(ErrorMessages.LAYER_COUNT_NOT_POSITIVE)
+            raise InvalidLengthException(len(coil_layers))
         if turns_per_layer <= 0:
-            raise ValueError(ErrorMessages.TURNS_PER_LAYER_NOT_POSITIVE)
+            raise InvalidLengthException(turns_per_layer)
         if trace_spacing_mm <= 0:
-            raise ValueError(ErrorMessages.LOOP_INCREMENT_NOT_POSITIVE)
+            raise InvalidLengthException(trace_spacing_mm)
         if trace_width_mm <= 0:
-            raise ValueError(ErrorMessages.WIDTH_NOT_POSITIVE)
+            raise InvalidLengthException(trace_width_mm)
 
         connecting_via_config = ViaConfig.get_connecting_via_config(
             via_outer_diameter_mm,
@@ -113,12 +105,12 @@ class RoundedCoil(KicadLegacyInterface):
         # generate net tie string
         self.net_tie_string = \
             f"{ViaConfig.CONNECTING_VIA_PAD_NUM}, \
-            {RoundedCoil._DEFAULT_UPPER_LAYER_PADNUM}, \
-            {RoundedCoil._DEFAULT_LOWER_LAYER_PADNUM}" \
+            {CircularCoil._DEFAULT_UPPER_LAYER_PADNUM}, \
+            {CircularCoil._DEFAULT_LOWER_LAYER_PADNUM}" \
             if len(coil_layers) > 1 \
             else \
-            f"{RoundedCoil._DEFAULT_UPPER_LAYER_PADNUM}, \
-            {RoundedCoil._DEFAULT_LOWER_LAYER_PADNUM}"
+            f"{CircularCoil._DEFAULT_UPPER_LAYER_PADNUM}, \
+            {CircularCoil._DEFAULT_LOWER_LAYER_PADNUM}"
 
         # generate coil spirals
         self.coil_spirals: list[LayerSpiral] = []
@@ -139,29 +131,29 @@ class RoundedCoil(KicadLegacyInterface):
             current_rotation_direction = current_rotation_direction.change_rotation_direction()
 
         # generate connectors to outside structures
-        self.outside_connectors: list[OutsideTraceConnector] = []
+        self.outside_connectors: list[ExternalGeometryConnector] = []
 
         # pads are wider than higher.
         # we simply use trace with as height, so horizontal connection off of pad looks nice
         # and scale the width according to a multiplier with the trace width
         # todo: let this be calculated by dedicated class?
-        pad_width_mm = RoundedCoil._DEFAULT_SOLDER_PAD_WIDH_MULTIPLIER * \
+        pad_width_mm = CircularCoil._DEFAULT_SOLDER_PAD_WIDH_MULTIPLIER * \
             trace_config.trace_width_mm
         pad_height_mm = trace_config.trace_width_mm
 
         # generate upper connector
         # todo: setting pad_num directly should be restricted
         upper_connector_via_config = deepcopy(connecting_via_config)
-        upper_connector_via_config.pad_num = RoundedCoil._DEFAULT_UPPER_LAYER_PADNUM
+        upper_connector_via_config.pad_num = CircularCoil._DEFAULT_UPPER_LAYER_PADNUM
 
         self.outside_connectors.append(
-            OutsideTraceConnector(
+            ExternalGeometryConnector(
                 True,
                 via_radius,
                 coil_layers[0],
                 upper_connector_via_config,
                 PadConfig(
-                    RoundedCoil._DEFAULT_UPPER_LAYER_PADNUM,
+                    CircularCoil._DEFAULT_UPPER_LAYER_PADNUM,
                     pad_width_mm,
                     pad_height_mm
                 ),
@@ -175,16 +167,16 @@ class RoundedCoil(KicadLegacyInterface):
             # todo: setting pad_num directly should be restricted
             # todo: deepcopy feels unclean
             lower_connector_via_config = deepcopy(connecting_via_config)
-            lower_connector_via_config.pad_num = RoundedCoil._DEFAULT_LOWER_LAYER_PADNUM
+            lower_connector_via_config.pad_num = CircularCoil._DEFAULT_LOWER_LAYER_PADNUM
 
             self.outside_connectors.append(
-                OutsideTraceConnector(
+                ExternalGeometryConnector(
                     False,
                     via_radius,
                     coil_layers[-1],
                     lower_connector_via_config,
                     PadConfig(
-                        RoundedCoil._DEFAULT_LOWER_LAYER_PADNUM,
+                        CircularCoil._DEFAULT_LOWER_LAYER_PADNUM,
                         pad_width_mm,
                         pad_height_mm
                     ),
@@ -193,7 +185,7 @@ class RoundedCoil(KicadLegacyInterface):
             )
         else:
             # todo: this should not be done via direct access of array elements and members
-            self.via_rings.inner_vias[-1].config.pad_num = RoundedCoil._DEFAULT_LOWER_LAYER_PADNUM
+            self.via_rings.inner_vias[-1].config.pad_num = CircularCoil._DEFAULT_LOWER_LAYER_PADNUM
 
         # generate trace inter connector between all structures to connect layers and coil ends
         self.trace_inner_inter_connectors: list[TraceInterConnector] = []

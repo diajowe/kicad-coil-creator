@@ -17,23 +17,62 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 -----------------------------------------------------------------
 
-This file is intended to store class definitions that directly 
-translate to the main KiCAD footprint object
+This file is intended to provide the footprint main structure and its configuration.
 See https://dev-docs.kicad.org/en/file-formats/sexpr-intro/index.html
 See https://dev-docs.kicad.org/en/file-formats/sexpr-footprint/index.html
 """
 
-from .footprint_objects import FootprintProperty
 from .helper_classes import Layer, Point
-from .rounded_coil import RoundedCoil
 from .legacy_kicad_interface import KicadLegacyInterface
+from .coil_interface import CoilInterface
+
+
+class FootprintProperty(KicadLegacyInterface):
+    """
+    KiCAD footprint property tag object, consisting of a key value pair
+    """
+
+    def __init__(
+        self,
+        position: Point,
+        layer: Layer,
+        key: str,
+        value: str
+        ):
+        """
+        Generate a footprint property object at a position, on a layer
+        :param position: Center position of the object to place
+        :param layer: Layer to place property object on
+        :param key: Key to use for the property object
+        :param value: Value to use for the property object
+        """
+        self.position = position
+        self.layer = layer
+        self.key = key
+        self.value = value
+
+    def to_legacy_api_string(self) -> str:
+        return f"""
+	    (property "{self.key}" "{self.value}"
+	    	(at {self.position.to_legacy_api_string()})
+	    	(unlocked yes)
+	    	(layer "{self.layer.to_legacy_api_string()}")
+	    	(hide no)
+	    	(effects
+	    		(font
+	    			(size 1 1)
+	    			(thickness 0.15)
+	    		)
+	    	)
+	    )
+        """
 
 class Footprint(KicadLegacyInterface):
     """
     KiCAD footprint main object
     """
 
-    def __init__(self, name: str, coil: RoundedCoil):
+    def __init__(self, name: str, coil: CoilInterface):
         """
         Generate a footprint object representing a coil
         :param name: Name of the coil displayed as parameter

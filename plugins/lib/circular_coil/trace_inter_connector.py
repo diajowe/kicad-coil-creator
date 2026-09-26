@@ -17,513 +17,32 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 -----------------------------------------------------------------
 
-This file is intended to store class definitions that
-generate coil sub-objects consisting of footprint objects
+This file is intended to provide the structure to connect layer spirals
+(see layer_spirals.py) to vias or other structures belonging to the coil
 """
 
-from copy import deepcopy
-from math import radians, sin, sqrt
+from math import sqrt
 from typing import Self
 
-from .legacy_kicad_interface import KicadLegacyInterface
-from .footprint_objects import Arc, Line, SolderPad, Via
-from .helper_classes import (
-    CoilGenException,
-    ErrorMessages,
-    InvalidLengthException,
+from .external_geometry_connector import ExternalGeometryConnector
+
+from ..footprint_objects.arc import Arc
+from ..footprint_objects.line import Line
+from ..footprint_objects.trace import TraceConfig
+from ..helper_classes import (
     Layer,
-    NotAnArcException,
-    PadConfig,
     Point,
+    PointsNotCurvingException,
     RotationDirection,
-    SpiralPosition,
-    TraceConfig,
-    ViaConfig
+    SpiralPosition
 )
-
-# todo: move exceptions to own file
-
-class SpiralLoop(KicadLegacyInterface):
-    """
-    Generates one loop of a spiral, from outside to inside
-    """
-
-    def __init__(
-        self,
-        arc1: Arc,
-        arc2: Arc
-    ):
-        """
-        Stores one loop of a layer spiral
-        :param arc1: First half of the loop
-        :param arc2: Second half of the loop
-        """
-        self.arc1 = arc1
-        self.arc2 = arc2
-
-    def get_start_point(self) -> Point:
-        """
-        Returns the start point of this coil spiral,
-        where a coil spiral always generates from outside to inside
-        """
-        return self.arc1.get_start_point()
-
-    def get_end_point(self) -> Point:
-        """
-        Returns the ending point of this coil spiral,
-        where a coil spiral always generates from outside to inside
-        """
-        return self.arc2.get_end_point()
-
-
-    @classmethod
-    def get_spiral_loop_from_params(
-        cls,
-        outer_radius_mm: float,
-        trace_config: TraceConfig,
-        layer: Layer,
-        rotation_direction: RotationDirection
-    ) -> Self:
-        """
-        Generates one loop of a layer spiral, with a certain trace width.
-        Rotation direction is seen from outer end point of loop
-        :param outer_radius_mm: Radius of outer end point of loop, 
-        if drawn on a circle concentric to origin
-        :param trace_config: Parameters for traces
-        :param layer: Layer to draw loop on
-        :param rotation_direction: Rotation direction of spiral loop is part of
-        :raises InvalidLengthException: If given outer_radius_mm is <= 0
-        """
-        if outer_radius_mm <= 0:
-            raise InvalidLengthException(outer_radius_mm)
-        # horizontal offset from spiral start point to end point
-        trace_increment = trace_config.trace_spacing_mm + trace_config.trace_width_mm
-
-        # arc outer points
-        p1 = Point(outer_radius_mm, 0)
-        p2 = Point(-outer_radius_mm + trace_config.get_trace_increment() / 2.0, 0)
-        p3 = Point(outer_radius_mm - trace_increment, 0)
-
-        # arc center points
-        p1_2 = Point(0, outer_radius_mm - trace_config.get_trace_increment() / 4.0)
-        p2_3 = Point(trace_increment / 2.0, -(outer_radius_mm - (trace_increment * 0.75)))
-
-        # depending on rotation direction, center points of arc need to be on other side of x axis
-        if rotation_direction != RotationDirection.CLOCKWISE:
-            p1_2.y *= -1
-            p2_3.y *= -1
-
-        return SpiralLoop(
-            Arc(p1, p1_2, p2, trace_config, layer),
-            Arc(p2, p2_3, p3, trace_config, layer)
-        )
-
-    def to_legacy_api_string(self) -> str:
-        return f"""
-        {self.arc1.to_legacy_api_string()}
-        {self.arc2.to_legacy_api_string()}
-        """
-
-# todo: document, do something with these
-class LayerSprialException(CoilGenException):
-    pass
-
-# todo: document, do something with these
-# inner needs to be smaller than outer
-class RadiusMismatchException(LayerSprialException):
-    def __init__(self, inner_radius_mm: float, outer_radius_mm: float):
-        self.inner_radius_mm = inner_radius_mm
-        self.outer_radius_mm = outer_radius_mm
-
-# todo: document, do something with these
-class InvalidLoopCountException(LayerSprialException):
-    def __init__(self, loop_count: int):
-        self.loop_count = loop_count
-
-class LayerSpiral(KicadLegacyInterface):
-    """
-    Generates the entire spiral for an entire coil layer
-    """
-
-    def __init__(self, loops: list[SpiralLoop], inner_radius_mm: float , outer_radius_mm: float):
-        """
-        Generates the single spiral for an entire coil layer
-        :param loops: All loops generated for a coil
-        :param inner_radius_mm: Smaller radius of the coil layer spiral in mm
-        :param outer_radius_mm: Greater radius of the coil layer spiral in mm
-        """
-        if outer_radius_mm <= inner_radius_mm:
-            raise RadiusMismatchException(inner_radius_mm, outer_radius_mm)
-
-        self.loops = loops
-        self.outer_radius_mm = outer_radius_mm
-        self.inner_radius_mm = inner_radius_mm
-
-
-    @classmethod
-    def get_layer_spiral(
-        cls,
-        loop_count: int,
-        outer_radius_mm: float,
-        trace_config: TraceConfig,
-        layer: Layer,
-        rotation_direction: RotationDirection
-    ) -> Self:
-        """
-        Generates the entire spiral for an entire coil layer
-        :param loop_count: How many loops the spiral should have
-        :param outer_radius_mm: Outer radius of coil spiral
-        :param trace_config: Parameters for traces
-        :param layer: Layer to draw loop on
-        :param rotation_direction: Rotation direction of spiral loop is part of
-        :returns: Full coil spiral, without connectors
-        :rtype: LayerSpiral
-        """
-        if outer_radius_mm <= 0:
-            raise InvalidLengthException(outer_radius_mm)
-        if loop_count <= 0:
-            raise InvalidLoopCountException(loop_count)
-
-        loops: list[SpiralLoop] = []
-
-        next_outer_radius_mm = outer_radius_mm
-
-        # generate required number of loops
-        for _ in range(loop_count):
-            current_loop = SpiralLoop.get_spiral_loop_from_params(
-                next_outer_radius_mm,
-                trace_config,
-                layer,
-                rotation_direction
-            )
-
-            next_outer_radius_mm = current_loop.get_end_point().x
-
-            loops.append(current_loop)
-
-        return LayerSpiral(loops, next_outer_radius_mm, outer_radius_mm)
-
-    def get_end_point(self, position: SpiralPosition) -> Point:
-        """
-        Returns the endpoint position of the layer spiral
-        :param position: Defines if the inner our outer connection point is desired
-        :returns: Position enf the spiral endpoint
-        :rtype: Point
-        """
-        if position == SpiralPosition.INSIDE:
-            return Point(self.inner_radius_mm, 0)
-        else:
-            return Point(self.outer_radius_mm, 0)
-
-    def to_legacy_api_string(self) -> str:
-        out = ""
-        for l in self.loops:
-            out += l.to_legacy_api_string()
-        return out
-
-
-class ViaRingCount:
-    """
-    Stores number of vias on each of the two via rings
-    """
-
-    def __init__(self, inner_ring_num: int, outer_ring_num: int):
-        if inner_ring_num < 0:
-            raise ValueError(ErrorMessages.NUM_VIAS_LESS_THAN_ZERO)
-        if outer_ring_num < 0:
-            raise ValueError(ErrorMessages.NUM_VIAS_LESS_THAN_ZERO)
-
-        self.inner_ring_num = inner_ring_num
-        self.outer_ring_num = outer_ring_num
-
-    @classmethod
-    def get_num_vias(cls, layer_count: int) -> Self:
-        """
-        Calculates number of vias required on each via ring
-        :param layer_count: Number of layers in coil
-        :return: Correlation of how many vias per ring
-        :rtype: ViaRingCount
-        """
-        # coils with uneven layer count need one extra via
-        # that allows connection of the coil endpoint as
-        # that coil end point would be inside the coil and
-        # we do not place solder pads inside the coil
-        num_vias = layer_count - (1 - layer_count % 2)
-        num_vias_inside = num_vias // 2 + 1
-        num_vias_outside = num_vias_inside - 1
-
-        return ViaRingCount(num_vias_inside, num_vias_outside)
-
-
-class ViaRingRadius:
-    """
-    Stores radius of rings on which to place connecting vias
-    """
-
-    def __init__(self, inner_radius_mm: float, outer_radius_mm: float):
-        """
-        Stores radius of rings on which to place connecting vias
-        :param inner_radius_mm: Radius of inner via ring
-        :param outer_radius_mm: Radius of outer via ring
-        """
-        self.inner_radius_mm = inner_radius_mm
-        self.outer_radius_mm = outer_radius_mm
-
-    @classmethod
-    def get_via_radius_from_coil_params(
-        cls,
-        coil_outer_radius_mm: float,
-        turns_per_layer: int,
-        trace_config: TraceConfig,
-        connecting_via_config: ViaConfig,
-    ) -> Self:
-        """
-        Calculates diameter at which vias need to be placed.
-        Vias are placed alternating on an inner circle and an outer circle
-        :param coil_outer_radius_mm: Desired outer coil radius.
-        Coil generation is from outside to inside, 
-        so if this is too small, coil loops may collide
-        :param turns_per_layer: Minimum number of turns per layer: 
-        Connecting to vias might introduce up to one more full turn
-        :param trace_config: Parameters of a trace
-        :param connecting_via_config: Configuration for connecting vias
-        :return: Calculated rings to place connecting vias on
-        :rtype: ViaRingRadius
-        """
-
-        # starting from the outer radius of the coil traces,
-        # remove the space of the coil itself,
-        # calculated by number of turns times trace width,
-        # to get the space used by the traces themselves
-        # then remove the distance covered by the spaces between the coil loop traces.
-        # need to take away the via radius or else the via ring will sit on a coil loop.
-        # we take away half more trace width to account for width of the innermost trace
-        # and alsod create a bit of breathing space and prevent via edge to collide with loop traces
-        # by removing two more nonexistant loop turns.
-        # this also allows space for traces connecting loops to vias
-        via_inner_ring_radius_mm = coil_outer_radius_mm \
-            - turns_per_layer * trace_config.trace_width_mm \
-            - turns_per_layer * trace_config.trace_spacing_mm \
-            - (connecting_via_config.outer_diameter_mm / 2) \
-            - (0.5 * trace_config.trace_width_mm) \
-            - 2 * (trace_config.trace_spacing_mm + trace_config.trace_width_mm)
-
-        # starting from the outer radius of the coil traces
-        # we need to add the via radius or else the via ring will sit on a coil loop.
-        # we add two more trace width and space beetween traces to create a bit of breathing space
-        # and prevent via edge to collide with loop traces
-        via_outer_ring_radius_mm = coil_outer_radius_mm \
-            + (connecting_via_config.outer_diameter_mm / 2) \
-            + 2 * (trace_config.trace_spacing_mm + trace_config.trace_width_mm)
-
-        return ViaRingRadius(via_inner_ring_radius_mm, via_outer_ring_radius_mm)
-
-
-class ViaRings(KicadLegacyInterface):
-    """
-    Generates vias on two rings
-    """
-
-    def __init__(self, inner_vias: list[Via], outer_vias: list[Via]):
-        """
-        Stores vias in two rings
-        :param inner_vias: Vias on inner ring
-        :param outer_vias: Vias on outer ring
-        """
-        self.inner_vias = inner_vias
-        self.outer_vias = outer_vias
-
-    @classmethod
-    def get_via_rings_from_settings(
-        cls,
-        ring_radius: ViaRingRadius,
-        num_on_rings: ViaRingCount,
-        config: ViaConfig
-    ) -> Self:
-        """
-        Generates vias on two rings according to given settings
-        :param ring_radius: Defines radius of the via rings
-        :param nom_on_rings: Defines number of vias on each ring
-        :param config: Defines the config applied to connecting vias
-        :returns: Vias sorted into two rings
-        :rtype: Self
-        """
-        inner_vias: list[Via] = []
-        outer_vias: list[Via] = []
-
-        # calculate degree steps aka how much degree between vias
-        if num_on_rings.inner_ring_num != 0:
-            inner_vias = ViaRings._generate_single_via_ring(
-                ring_radius.inner_radius_mm,
-                num_on_rings.inner_ring_num,
-                config
-            )
-
-        if num_on_rings.outer_ring_num != 0:
-            outer_vias = ViaRings._generate_single_via_ring(
-                ring_radius.outer_radius_mm,
-                num_on_rings.outer_ring_num,
-                config
-            )
-
-        return ViaRings(inner_vias, outer_vias)
-
-    @classmethod
-    def _generate_single_via_ring(
-        cls,
-        radius: float,
-        num_on_ring: int,
-        config: ViaConfig
-    ) -> list[Via]:
-        """
-        Generates vias for a single via ring with given parameters
-        :param radius: Radius of ring to place vias on > 0
-        :param num_on_ring: Number of vias to place on ring >= 0
-        :param config: Config of connecting vias
-        :rtype: list[Via]
-        """
-        if radius <= 0:
-            raise ValueError(ErrorMessages.RADIUS_NOT_POSITIVE)
-        if num_on_ring < 0:
-            raise ValueError(ErrorMessages.NUM_VIAS_LESS_THAN_ZERO)
-
-        vias: list[Via] = []
-        degree_steps = 360.0 / (num_on_ring)
-
-        for via_num in range(num_on_ring):
-            # generate rotational position of via
-            current_via_rotation_deg = via_num * degree_steps
-
-            # from rotation, calculate width and height of via
-            via_pos_y = sin(radians(
-                current_via_rotation_deg)) * radius
-            via_pos_x = sqrt(radius**2 - via_pos_y**2)
-            if current_via_rotation_deg > 90 and current_via_rotation_deg < 270:
-                via_pos_x *= -1
-
-            vias.append(Via(Point(via_pos_x, via_pos_y), deepcopy(config)))
-
-        return vias
-
-    def to_legacy_api_string(self) -> str:
-        out = ""
-
-        all_vias: list[Via] = []
-        all_vias.extend(self.inner_vias)
-        all_vias.extend(self.outer_vias)
-
-        for via in all_vias:
-            out += f"{via.to_legacy_api_string()}\n"
-
-        return out
-
-
-
-
-class OutsideTraceConnector(KicadLegacyInterface):
-    """
-    Footprint connector used to connect other PCB parts.
-    Do not mistake for connectors between vias and coil spirals (TraceInterConnector)
-    """
-
-    def __init__(
-        self,
-        is_upper_connector: bool,
-        via_radius: ViaRingRadius,
-        layer: Layer,
-        connecting_via_config: ViaConfig,
-        pad_config: PadConfig,
-        rotation_direction: RotationDirection
-    ):
-        """
-        Generates a connector to connect outside traces to this coil footprint
-        Generates a SMD pad if connector resides on an outside layer, else a via with pad number 
-        :param is_upper_connector: True if the position for the upper connector should be generated
-        :param via_radius: Radius of via rings
-        :param layer: Defines the layer the connector should reside on (via output is on all layers)
-        :param connecting_via_config: Config for connecting vias
-        :param pad_config: Config for connecting pads
-        :param rotation_direction: Rotation direction of coil, from outside to inside
-        """
-        self.is_pad = layer.is_outside_layer
-        self.center_position = OutsideTraceConnector._generate_position(
-            is_upper_connector,
-            via_radius,
-            connecting_via_config,
-            pad_config,
-            rotation_direction
-        )
-
-        # on older KiCAD versions, we could generated a SMD solder pad on any layer, and it would
-        # just produce as a normal trace then. Newer KiCAD version seem to not generate the SMD pad
-        # when it is "buried", but also dont issue a warning. To circumvent that, we simply generate
-        # a via to connect with instead of a solder pad, if the connector is not on an outside layer
-        if self.is_pad:
-            self.connector = SolderPad(self.center_position, pad_config, layer)
-        else:
-            self.connector = Via(self.center_position, connecting_via_config)
-
-    def get_connector_position(self) -> Point:
-        """
-        Returns the desired position to connect with generated pad
-        :returns: Position to connect with pad
-        :rtype: Point
-        """
-        if self.is_pad:
-            # todo: this should be shifted  to the edge of the pad
-            return self.center_position
-        else:
-            return self.center_position
-
-    @classmethod
-    def _generate_position(
-        cls,
-        is_upper_connector: bool,
-        via_radius: ViaRingRadius,
-        connecting_via_config: ViaConfig,
-        pad_config: PadConfig,
-        rotation_direction: RotationDirection
-    ) -> Point:
-        """
-        Calculates the target position of a connector to outside traces
-        :param is_upper_connector: True if the position for the upper connector should be generated
-        :param via_radius: Radius of via rings
-        :param connecting_via_config: Config for connecting vias
-        :param rotation_direction: Rotation direction of coil, from outside to inside
-        """
-
-        # outside trace connectors need to be placed outside
-        # of the way of the outer connecting vias in x direction
-        # in y direction, they need to be placed above and
-        # below a possible generated connecting via with y=0
-        # so that the horizontal connecting traces to the coil do not collide with the via
-        x_offset = via_radius.outer_radius_mm \
-            + connecting_via_config.outer_diameter_mm / 2.0 \
-            + pad_config.pad_width_mm
-        y_offset = connecting_via_config.outer_diameter_mm + pad_config.pad_height_mm
-
-        center_point = Point(x_offset, y_offset)
-
-        # if rotation direction of coil is counter clockwise,
-        # pad point needs to be below x axis, else above
-        if (is_upper_connector and rotation_direction == RotationDirection.CLOCKWISE) or \
-                (not is_upper_connector
-                 and rotation_direction == RotationDirection.COUNTER_CLOCKWISE):
-            center_point.y *= -1
-
-        return center_point
-
-    def to_legacy_api_string(self) -> str:
-        return f"""
-            {self.connector.to_legacy_api_string()}
-        """
-
+from ..legacy_kicad_interface import KicadLegacyInterface
 
 class TraceInterConnector(KicadLegacyInterface):
     """
     Connector used to connect different parts of the coil
-    Do not mistake for connectors to other PCB parts (OutsideTraceConnector)
-    This may connect a coil layer spiral to a OutsideTraceConnector
+    Do not mistake for connectors to other PCB parts (ExternalGeometryConnector)
+    This may connect a coil layer spiral to a ExternalGeometryConnector
     """
 
     def __init__(
@@ -543,17 +62,17 @@ class TraceInterConnector(KicadLegacyInterface):
     def get_connector_for_spiral_to_outside_trace_connector(
         cls,
         trace_end: Point,
-        outside_trace_connector: OutsideTraceConnector,
+        outside_trace_connector: ExternalGeometryConnector,
         trace_config: TraceConfig,
         layer_rotation_direction: RotationDirection,
         layer: Layer
     ) -> Self:
         """
-        Generates connector traces between points trace end and OutsideTraceConnector,
+        Generates connector traces between points trace end and ExternalGeometryConnector,
         it will attempt to generate a seamless connection from trace_end,
-        but bridge the gap to OutsideTraceConnector with a horizontal line
+        but bridge the gap to ExternalGeometryConnector with a horizontal line
         :param trace_end: endpoint of trace to connect
-        :param outisde_trace_connector: center point of OutsideTraceConnector to connect to
+        :param outisde_trace_connector: center point of ExternalGeometryConnector to connect to
         :param trace_config: Parameters of traces
         :param layer_rotation_direction: Rotation direction of the coil layer,
         as seen from outside to inside
@@ -750,14 +269,14 @@ class TraceInterConnector(KicadLegacyInterface):
     def _generate_line_from_via_horizontal(
         cls,
         trace_end: Point,
-        outside_trace_connector: OutsideTraceConnector,
+        outside_trace_connector: ExternalGeometryConnector,
         trace_config: TraceConfig,
         layer: Layer
     ) -> (Line, Point):
         """
         Generates the horizontal straight line from a 
         outside trace connector towards the coil spiral
-        Should be used for generating connectors to OutsideTraceConnector only
+        Should be used for generating connectors to ExternalGeometryConnector only
         :param trace_end: Endpoint of layer spiral to connect to
         :param outside_trace_connector: OutsideTraceConector to connect to
         :param trace_config: Parameters for drawing traces
@@ -916,7 +435,7 @@ class TraceInterConnector(KicadLegacyInterface):
                     trace_config,
                     layer
                 ))
-        except NotAnArcException:
+        except PointsNotCurvingException:
             output_lines.append(
                 Line(start_point, end_point, trace_config, layer))
 
