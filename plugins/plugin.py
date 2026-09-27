@@ -1,18 +1,26 @@
 import os
 import logging
 import json
-import math
 
 import wx  # type: ignore
 import pcbnew  # type: ignore
 import traceback
+#todo: make all objects members "private" where applicable
 
-from .lib import menu
-from .lib import coilgenerator
+from .generator.coil_interface import CommonCoilConfig
+from .generator.footprint import Footprint
+from .generator.footprint_objects.trace import TraceConfig
+from .generator.footprint_objects.via import ViaConfig
+from .generator.helper_classes import Layer
+
+from .generator.footprint_objects.trace import TraceConfig
+from .generator.footprint_objects.via import ViaDiameterConfig
+from . import menu
+from .generator import generate
 
 # WX GUI form that show coil settings
 
-from .lib.helper_classes import Layer, RotationDirection
+from .generator.helper_classes import Layer, RotationDirection
 
 # todo: we generate up to one full turn to get to the next vias, as loops always start on the x axis
 
@@ -311,18 +319,18 @@ class CoilGeneratorUI(wx.Frame):
             layer_names[0] = Layer("F.Cu", True)
             layer_names[-1] = Layer("B.Cu", True)
 
-            template = coilgenerator.generate(
-                self._parse_data("layer_count"),
-                RotationDirection.CLOCKWISE if self._parse_data("turn_direction") else RotationDirection.COUNTER_CLOCKWISE ,
-                self._parse_data("turns_count"),
-                self._parse_data("trace_width"),
-                self._parse_data("trace_spacing"),
-                self._parse_data("via_outer"),
-                self._parse_data("via_drill"),
+            rotation_direction = RotationDirection.CLOCKWISE if self._parse_data("turn_direction") else RotationDirection.COUNTER_CLOCKWISE
+            common_coil_config = CommonCoilConfig(
                 self._parse_data("outer_diameter"),
-                self._parse_data("name"),
-                layer_names
-            )
+                rotation_direction,
+                layer_names[:(self._parse_data("layer_count"))],
+                self._parse_data("turns_count"),
+)
+            via_diameter_config = ViaDiameterConfig(self._parse_data("via_outer"), self._parse_data("via_drill"))
+
+            trace_config = TraceConfig(self._parse_data("trace_width"), self._parse_data("trace_spacing"),)
+
+            template = generate(self._parse_data("name"), common_coil_config, trace_config, via_diameter_config)
 
             self.logger.log(logging.INFO, "Done.")
 
@@ -491,16 +499,17 @@ class CoilGeneratorUI(wx.Frame):
             if self._parse_data("via_outer") < self._parse_data("via_drill"):
                 self.notes.SetLabel(
                     "WARNING: Via drill is greater than outer diameter")
-            elif not self.estimate_is_coil_generatable(
-                    self._parse_data("outer_diameter"),
-                    self._parse_data("turns_count"),
-                    self._parse_data("trace_width"),
-                    self._parse_data("trace_spacing"),
-                    self._parse_data("via_outer"),
-                    self._parse_data("layer_count")
-            ):
-                self.notes.SetLabel(
-                    "WARNING: This coil MAY not be generatable.")
+# todo: enable check for generatability again
+#            elif not self.estimate_is_coil_generatable(
+#                    self._parse_data("outer_diameter"),
+#                    self._parse_data("turns_count"),
+#                    self._parse_data("trace_width"),
+#                    self._parse_data("trace_spacing"),
+#                    self._parse_data("via_outer"),
+#                    self._parse_data("layer_count")
+#            ):
+#                self.notes.SetLabel(
+#                    "WARNING: This coil MAY not be generatable.")
             else:
                 self.notes.SetLabel("")
         except Exception as e:
@@ -512,43 +521,43 @@ class CoilGeneratorUI(wx.Frame):
             self.elem_button_generate.Disable()
             self.elem_button_save.Disable()
 
-    def estimate_is_coil_generatable(self, outer_diameter, turns_per_layer, trace_width, trace_spacing, via_diameter, layer_count):
-        """
-        Checks if a coil is generatable.
-        If this returns true, the coil is likely to be fault free.
-        If this return false, the coil is likely to be faulty.
-        Checks are ESTIMATES only
-        Checks this by checking inner via placement
-        Args:
-                outer_diameter: Desires outer coil diameter. Coil generation is from outside to inside, so if this is too small, coil wraps may collode
-                turns_per_layer: Minimum number of turns per layer: Connecting to vias might introduce up to one more turn
-                trace_width: Width of line trace
-                trace_spacing: Distance between line traces
-                via_diameter: Outer diameter of connecting vias
-                layer_count: Number of layers in coil
-
-        Returns:
-                Bool: False, if coil is definitely not generatable, True, if coil MAY be generatable
-        """
-        return True
-        # todo: enable again
-        (via_inner_diameter, _) = coilgenerator.get_via_radius(
-            outer_diameter, turns_per_layer, trace_width, trace_spacing, via_diameter)
-
-        # if via diameter is negative, then coil spiral traces are overlapping in one layer, even without considering vias
-        if via_inner_diameter <= 0:
-            return False
-
-        # check if inner vias fit on radius
-        (num_vias_inside, _) = coilgenerator.get_num_vias(layer_count)
-
-        circumference = 2 * math.pi * (via_inner_diameter / 2)
-
-        # using trace width as minimum distance between vias, a ROUGH ESTIMATE can be made if the vias fit on the chosen circle
-        if circumference - num_vias_inside * (via_diameter + trace_width) < 0:
-            return False
-
-        return True
+#    def estimate_is_coil_generatable(self, outer_diameter, turns_per_layer, trace_width, trace_spacing, via_diameter, layer_count):
+#        """
+#        Checks if a coil is generatable.
+#        If this returns true, the coil is likely to be fault free.
+#        If this return false, the coil is likely to be faulty.
+#        Checks are ESTIMATES only
+#        Checks this by checking inner via placement
+#        Args:
+#                outer_diameter: Desires outer coil diameter. Coil generation is from outside to inside, so if this is too small, coil wraps may collode
+#                turns_per_layer: Minimum number of turns per layer: Connecting to vias might introduce up to one more turn
+#                trace_width: Width of line trace
+#                trace_spacing: Distance between line traces
+#                via_diameter: Outer diameter of connecting vias
+#                layer_count: Number of layers in coil
+#
+#        Returns:
+#                Bool: False, if coil is definitely not generatable, True, if coil MAY be generatable
+#        """
+#        return True
+#        # todo: enable again
+#        (via_inner_diameter, _) = coilgenerator.get_via_radius(
+#            outer_diameter, turns_per_layer, trace_width, trace_spacing, via_diameter)
+#
+#        # if via diameter is negative, then coil spiral traces are overlapping in one layer, even without considering vias
+#        if via_inner_diameter <= 0:
+#            return False
+#
+#        # check if inner vias fit on radius
+#        (num_vias_inside, _) = coilgenerator.get_num_vias(layer_count)
+#
+#        circumference = 2 * math.pi * (via_inner_diameter / 2)
+#
+#        # using trace width as minimum distance between vias, a ROUGH ESTIMATE can be made if the vias fit on the chosen circle
+#        if circumference - num_vias_inside * (via_diameter + trace_width) < 0:
+#            return False
+#
+#        return True
 
 
 def get_safe_name(name, keepcharacters=(' ', '.', '_')):

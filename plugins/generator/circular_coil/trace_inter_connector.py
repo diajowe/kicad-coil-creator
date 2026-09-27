@@ -529,4 +529,3 @@ class TraceInterConnector(KicadLegacyInterface):
         for arc in self.arcs:
             out += arc.to_legacy_api_string()
         return out
-

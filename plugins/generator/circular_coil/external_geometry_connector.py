@@ -105,9 +105,10 @@ class ExternalGeometryConnector(KicadLegacyInterface):
         # below a possible generated connecting via with y=0
         # so that the horizontal connecting traces to the coil do not collide with the via
         x_offset = via_radius.outer_radius_mm \
-            + connecting_via_config.outer_diameter_mm / 2.0 \
+            + connecting_via_config.diameter_config.outer_diameter_mm / 2.0 \
             + pad_config.pad_width_mm
-        y_offset = connecting_via_config.outer_diameter_mm + pad_config.pad_height_mm
+        y_offset = connecting_via_config.diameter_config.outer_diameter_mm \
+            + pad_config.pad_height_mm
 
         center_point = Point(x_offset, y_offset)
 

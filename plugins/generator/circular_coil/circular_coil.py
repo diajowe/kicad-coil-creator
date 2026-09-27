@@ -28,13 +28,12 @@ from .layer_spiral import LayerSpiral
 from .trace_inter_connector import TraceInterConnector
 from .via_rings import ViaRingCount, ViaRingRadius, ViaRings
 
-from ..exceptions import InvalidLengthException
+from ..coil_interface import CoilInterface, CommonCoilConfig
 from ..footprint_objects.trace import TraceConfig
-from ..footprint_objects.via import ViaConfig, PadConfig
-from ..helper_classes import Layer, RotationDirection, SpiralPosition
-from ..legacy_kicad_interface import KicadLegacyInterface
+from ..footprint_objects.via import ViaConfig, ViaDiameterConfig, PadConfig
+from ..helper_classes import SpiralPosition
 
-class CircularCoil(KicadLegacyInterface):
+class CircularCoil(CoilInterface):
     """
     Generates round coils
     """
@@ -45,60 +44,29 @@ class CircularCoil(KicadLegacyInterface):
 
     def __init__(
         self,
-        coil_outer_diameter_mm: float,
-        rotation_direction: RotationDirection,
-        coil_layers: list[Layer],
-        turns_per_layer: int,
-        trace_width_mm: float,
-        trace_spacing_mm: float,
-        via_outer_diameter_mm: float,
-        via_drill_diameter_mm: float,
+        common_coil_config: CommonCoilConfig,
+        trace_config: TraceConfig,
+        via_diameter_config: ViaDiameterConfig
     ):
         """
-        Generates circular coil according to given parameter.
+        Generates circular coil according to given parameters.
         Does not guarantee that a coil with given parameter will be properly manufacturable
-        :param coil_outer_diameter_mm: Outer diameter of coil, in mm, if coil were perfectly round
-        :param rotation_direction: Marks turn direction of coil sprials
-        :param coil_layers: Defines the layers the coil should be drawn on, from first to last index
-        :param turns_per_layer: How many loops to do on each layer
-        :param trace_width_mm: Width of the drawn trace in mm
-        :param trace_spacing_mm: Desired spacing in mm in between traces of a coil spiral
-        :param via_outer_diameter_mm: Outer connecting via diameter in mm
-        :param via_drill_diameter_mm: Drill hole diameter of connecting via
+        :param common_coil_config: Parameters all types of coil share
+        :param trace_config: Parameters of a trace
+        :param via_diameter_config: Configuration for via diameters
         """
-        # todo : do not raise those on your own, have config objects do that
-        if coil_outer_diameter_mm <= 0:
-            raise InvalidLengthException(coil_outer_diameter_mm)
-        if via_outer_diameter_mm <= 0:
-            raise InvalidLengthException(via_outer_diameter_mm)
-        if via_drill_diameter_mm <= 0:
-            raise InvalidLengthException(via_drill_diameter_mm)
-        if len(coil_layers) <= 0:
-            raise InvalidLengthException(len(coil_layers))
-        if turns_per_layer <= 0:
-            raise InvalidLengthException(turns_per_layer)
-        if trace_spacing_mm <= 0:
-            raise InvalidLengthException(trace_spacing_mm)
-        if trace_width_mm <= 0:
-            raise InvalidLengthException(trace_width_mm)
 
-        connecting_via_config = ViaConfig.get_connecting_via_config(
-            via_outer_diameter_mm,
-            via_drill_diameter_mm
-        )
-
-        trace_config = TraceConfig(trace_width_mm, trace_spacing_mm)
+        connecting_via_config = ViaConfig.get_connecting_via_config(via_diameter_config)
 
         # generate via rings
         via_radius = ViaRingRadius.get_via_radius_from_coil_params(
-            coil_outer_diameter_mm / 2.0,
-            turns_per_layer,
+            common_coil_config,
             trace_config,
             connecting_via_config
         )
         self.via_rings = ViaRings.get_via_rings_from_settings(
             via_radius,
-            ViaRingCount.get_num_vias(len(coil_layers)),
+            ViaRingCount.get_num_vias(common_coil_config),
             connecting_via_config
         )
 
@@ -107,20 +75,20 @@ class CircularCoil(KicadLegacyInterface):
             f"{ViaConfig.CONNECTING_VIA_PAD_NUM}, \
             {CircularCoil._DEFAULT_UPPER_LAYER_PADNUM}, \
             {CircularCoil._DEFAULT_LOWER_LAYER_PADNUM}" \
-            if len(coil_layers) > 1 \
+            if common_coil_config.get_layer_count() > 1 \
             else \
             f"{CircularCoil._DEFAULT_UPPER_LAYER_PADNUM}, \
             {CircularCoil._DEFAULT_LOWER_LAYER_PADNUM}"
 
         # generate coil spirals
         self.coil_spirals: list[LayerSpiral] = []
-        current_rotation_direction = rotation_direction
+        current_rotation_direction = common_coil_config.rotation_direction
 
-        for layer in coil_layers:
+        for layer in common_coil_config.coil_layers:
             # todo: unify radius and diameter everywhere
             self.coil_spirals.append(LayerSpiral.get_layer_spiral(
-                turns_per_layer,
-                coil_outer_diameter_mm / 2.0,
+                common_coil_config.turns_per_layer,
+                common_coil_config.coil_outer_diameter_mm / 2.0,
                 trace_config,
                 layer,
                 current_rotation_direction
@@ -150,20 +118,20 @@ class CircularCoil(KicadLegacyInterface):
             ExternalGeometryConnector(
                 True,
                 via_radius,
-                coil_layers[0],
+                common_coil_config.coil_layers[0],
                 upper_connector_via_config,
                 PadConfig(
                     CircularCoil._DEFAULT_UPPER_LAYER_PADNUM,
                     pad_width_mm,
                     pad_height_mm
                 ),
-                rotation_direction
+                common_coil_config.rotation_direction
             )
         )
 
         # generate lower connector only if layer count for coil is even,
         # else the last connecting via inside needs to be "connector"
-        if len(coil_layers) % 2 == 0:
+        if common_coil_config.get_layer_count() % 2 == 0:
             # todo: setting pad_num directly should be restricted
             # todo: deepcopy feels unclean
             lower_connector_via_config = deepcopy(connecting_via_config)
@@ -173,14 +141,14 @@ class CircularCoil(KicadLegacyInterface):
                 ExternalGeometryConnector(
                     False,
                     via_radius,
-                    coil_layers[-1],
+                    common_coil_config.coil_layers[-1],
                     lower_connector_via_config,
                     PadConfig(
                         CircularCoil._DEFAULT_LOWER_LAYER_PADNUM,
                         pad_width_mm,
                         pad_height_mm
                     ),
-                    rotation_direction
+                    common_coil_config.rotation_direction
                 )
             )
         else:
@@ -190,8 +158,8 @@ class CircularCoil(KicadLegacyInterface):
         # generate trace inter connector between all structures to connect layers and coil ends
         self.trace_inner_inter_connectors: list[TraceInterConnector] = []
 
-        current_rotation_direction = rotation_direction
-        for (index, layer) in enumerate(coil_layers):
+        current_rotation_direction = common_coil_config.rotation_direction
+        for (index, layer) in enumerate(common_coil_config.coil_layers):
             current_inner_trace_end = self.coil_spirals[index].get_end_point(
                 SpiralPosition.INSIDE)
             current_outer_trace_end = self.coil_spirals[index].get_end_point(
@@ -200,8 +168,8 @@ class CircularCoil(KicadLegacyInterface):
             current_inner_via = self.via_rings.inner_vias[int(
                 index / 2)].get_center_point()
 
-            if index == len(coil_layers) - 1:
-                if len(coil_layers) % 2 == 0:
+            if index == common_coil_config.get_layer_count()- 1:
+                if common_coil_config.get_layer_count() % 2 == 0:
                     self.trace_inner_inter_connectors.append(
                         TraceInterConnector.get_connector_for_spiral_to_outside_trace_connector(
                             current_outer_trace_end,

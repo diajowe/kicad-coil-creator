@@ -17,24 +17,26 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 -----------------------------------------------------------------
 
-This file is intended to store structures to unify coil generation
-by providing a single interface for all types of coils
+This file is intended to store custom exception bases for exceptions thrown by this library
 """
 
-from abc import ABC, abstractmethod
+from typing import Union
 
-from .legacy_kicad_interface import KicadLegacyInterface
-
-class CoilInterface(KicadLegacyInterface, ABC):
+class CoilGenException(Exception):
     """
-    Defines functions to uniformly handle coils and their generation
+    Base exception class where all custom exceptions should derive from
     """
 
-    @abstractmethod
-    def to_legacy_api_string(self) -> str:
-        """
-        Converts coil object to legacy string based KiCAD API string,
-        intended to be used in footprints
-        :return: Legacy KiCAD API string
-        :rtype: str
-        """
+class CoilGenValueException(CoilGenException):
+    """
+    Custom exception that serves the same purpose as python's builtin ValueError,
+    but restricted to int or float
+    :param value: Invalid value received
+    """
+    def __init__(self, value: Union[int, float]):
+        self.value = value
+
+class InvalidLengthException(CoilGenValueException):
+    """
+    Custom exception raised when a length <= 0 was given, but a value > 0 was expected
+    """

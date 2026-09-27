@@ -32,6 +32,7 @@ from ..footprint_objects.via import Via, ViaConfig
 from ..exceptions import CoilGenException, InvalidLengthException
 from ..helper_classes import Point
 from ..legacy_kicad_interface import KicadLegacyInterface
+from ..coil_interface import CommonCoilConfig
 
 class ViaRingsException(CoilGenException):
     """
@@ -53,10 +54,10 @@ class ViaRingCount:
         self.outer_ring_num = outer_ring_num
 
     @classmethod
-    def get_num_vias(cls, layer_count: int) -> Self:
+    def get_num_vias(cls, common_coil_config: CommonCoilConfig) -> Self:
         """
         Calculates number of vias required on each via ring
-        :param layer_count: Number of layers in coil
+        :param common_coil_config: Common coil parameter settings, to extract layer count
         :return: Correlation of how many vias per ring
         :rtype: ViaRingCount
         """
@@ -64,12 +65,12 @@ class ViaRingCount:
         # that allows connection of the coil endpoint as
         # that coil end point would be inside the coil and
         # we do not place solder pads inside the coil
-        num_vias = layer_count - (1 - layer_count % 2)
+        num_vias = common_coil_config.get_layer_count() \
+            - (1 - common_coil_config.get_layer_count() % 2)
         num_vias_inside = num_vias // 2 + 1
         num_vias_outside = num_vias_inside - 1
 
         return ViaRingCount(num_vias_inside, num_vias_outside)
-
 
 class ViaRingRadius:
     """
@@ -88,25 +89,20 @@ class ViaRingRadius:
     @classmethod
     def get_via_radius_from_coil_params(
         cls,
-        coil_outer_radius_mm: float,
-        turns_per_layer: int,
+        common_coil_config: CommonCoilConfig,
         trace_config: TraceConfig,
         connecting_via_config: ViaConfig,
     ) -> Self:
         """
         Calculates diameter at which vias need to be placed.
         Vias are placed alternating on an inner circle and an outer circle
-        :param coil_outer_radius_mm: Desired outer coil radius.
-        Coil generation is from outside to inside, 
-        so if this is too small, coil loops may collide
-        :param turns_per_layer: Minimum number of turns per layer: 
-        Connecting to vias might introduce up to one more full turn
+        :param common_coil_config: Parameters all types of coil share
         :param trace_config: Parameters of a trace
         :param connecting_via_config: Configuration for connecting vias
         :return: Calculated rings to place connecting vias on
         :rtype: ViaRingRadius
         """
-
+        coil_outer_radius_mm = common_coil_config.coil_outer_diameter_mm / 2.0
         # starting from the outer radius of the coil traces,
         # remove the space of the coil itself,
         # calculated by number of turns times trace width,
@@ -118,9 +114,9 @@ class ViaRingRadius:
         # by removing two more nonexistant loop turns.
         # this also allows space for traces connecting loops to vias
         via_inner_ring_radius_mm = coil_outer_radius_mm \
-            - turns_per_layer * trace_config.trace_width_mm \
-            - turns_per_layer * trace_config.trace_spacing_mm \
-            - (connecting_via_config.outer_diameter_mm / 2) \
+            - common_coil_config.turns_per_layer * trace_config.trace_width_mm \
+            - common_coil_config.turns_per_layer * trace_config.trace_spacing_mm \
+            - (connecting_via_config.diameter_config.outer_diameter_mm / 2) \
             - (0.5 * trace_config.trace_width_mm) \
             - 2 * (trace_config.trace_spacing_mm + trace_config.trace_width_mm)
 
@@ -129,7 +125,7 @@ class ViaRingRadius:
         # we add two more trace width and space beetween traces to create a bit of breathing space
         # and prevent via edge to collide with loop traces
         via_outer_ring_radius_mm = coil_outer_radius_mm \
-            + (connecting_via_config.outer_diameter_mm / 2) \
+            + (connecting_via_config.diameter_config.outer_diameter_mm / 2) \
             + 2 * (trace_config.trace_spacing_mm + trace_config.trace_width_mm)
 
         return ViaRingRadius(via_inner_ring_radius_mm, via_outer_ring_radius_mm)
