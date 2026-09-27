@@ -187,7 +187,8 @@ class Via(KicadLegacyInterface):
         return f"""
         (pad "{self.config.pad_num}" {PadType.THRU_HOLE.value} {PadShape.CIRCLE.value}
     		(at {self.position.to_legacy_api_string()})
-    		(size {self.config.diameter_config.outer_diameter_mm} {self.config.diameter_config.outer_diameter_mm})
+    		(size {self.config.diameter_config.outer_diameter_mm} \
+            {self.config.diameter_config.outer_diameter_mm})
     		(drill {self.config.diameter_config.drill_diameter_mm})
     		(layers *.Cu)
     		(remove_unused_layers yes)
