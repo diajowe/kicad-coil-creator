@@ -33,6 +33,6 @@ class KicadLegacyInterface(ABC):
     def to_legacy_api_string(self) -> str:
         """
         Converts python object to legacy string based KiCAD API string
-        :return: Legacy KiCAD API string
+        :returns: Legacy KiCAD API string
         :rtype: str
         """

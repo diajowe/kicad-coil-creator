@@ -128,7 +128,7 @@ class ViaConfig:
         Defines via parameters for connecting vias (where pad number is static)
         Connecting vias interconnect parts of a coil (contrary to outside connectors)
         :param via_diameter_config: Configuration parameters for via diameters
-        :return: Parameters for connecting vias
+        :returns: Parameters for connecting vias
         :rtype: ViaConfig
         """
 

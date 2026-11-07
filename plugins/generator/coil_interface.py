@@ -62,7 +62,7 @@ class CommonCoilConfig:
         self.rotation_direction = rotation_direction
         self.coil_layers = coil_layers
         self.turns_per_layer = turns_per_layer
-    
+
     def get_layer_count(self) -> int:
         """
         Returns the number of layer in a coil

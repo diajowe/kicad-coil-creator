@@ -368,7 +368,7 @@ class TraceInterConnector(KicadLegacyInterface):
         """
         Generates one of the required arcs to reach from layer spiral to via edge connector,
         or a line, in some special cases, and stores them in the output_* parameters.
-        This function does not return Union[Arc|Line] as then calling code would have to 
+        This function does not return Union[Arc,Line] as then calling code would have to 
         manually check the output type and handle unexpected types, so instead this function
         simply appends to the output_* parameters and hides type checking in its own body
         (for example if points are too close to each other and arc would collapse to a line)

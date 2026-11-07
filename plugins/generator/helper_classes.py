@@ -21,7 +21,8 @@ This file is intended to store objects aiding in creating coil
 footprints that do not directly translate to footprint contents
 """
 
-from dataclasses import dataclass
+# todo: use dataclasses for less boilerplate code?
+
 from enum import Enum
 from math import atan2, cos, degrees, radians, sin, sqrt
 from typing import Self
@@ -54,7 +55,6 @@ class NormalizeException(PointException):
     the point should be moved to would be unclear.
     """
 
-@dataclass
 class Point(KicadLegacyInterface):
     """
     Footprint objects need to be defined somehow. 
@@ -62,8 +62,6 @@ class Point(KicadLegacyInterface):
     X increases towards right screen border,
     Y increases towards bottom screen border
     """
-    x: float
-    y: float
 
     def __init__(self, x: float, y: float):
         """

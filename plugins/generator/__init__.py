@@ -23,13 +23,13 @@ This file is intended to give an entry point to generating coils of all types
 
 from .circular_coil import CircularCoil
 from .coil_interface import CommonCoilConfig
-from .footprint import Footprint
+from .footprint import Footprint, FootprintConfig
 from .footprint_objects.trace import TraceConfig
 from .footprint_objects.via import ViaDiameterConfig
 from .helper_classes import Layer
 
 def generate(
-    coil_name: str,
+    footprint_config: FootprintConfig,
     common_coil_config: CommonCoilConfig,
     trace_config: TraceConfig,
     via_diameter_config: ViaDiameterConfig
@@ -38,11 +38,11 @@ def generate(
     Generates (currently) circular coil according to given parameters.
     Later should be used for generating other type of coils too
     Does not guarantee that a coil with given parameter will be properly manufacturable
-    :param coil_name: Name of the coil to be used in PCB
+    :param footprint_config: Parameters related to footprint generation
     :param common_coil_config: Parameters all types of coil share
     :param trace_config: Parameters of a trace
     :param via_diameter_config: Configuration for via diameters
     """
 
     coil = CircularCoil(common_coil_config, trace_config, via_diameter_config)
-    return Footprint(coil_name, coil).to_legacy_api_string()
+    return Footprint(footprint_config, coil).to_legacy_api_string()

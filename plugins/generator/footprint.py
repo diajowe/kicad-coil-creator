@@ -27,6 +27,31 @@ from .legacy_kicad_interface import KicadLegacyInterface
 from .coil_interface import CoilInterface
 
 
+
+class FootprintConfig:
+    """
+    Groups together common configuration parameters for footprints
+    """
+
+    def __init__(
+        self,
+        name: str,
+        ):
+        """
+        Defines footprint parameters
+        :param name: Designated footprint name
+        """
+
+        self.name = name
+
+    def get_name(self) -> str:
+        """
+        Returns the designated name of the footprint
+        :returns: Designated name of the footprint
+        :rtype: str
+        """
+        return self.name
+
 class FootprintProperty(KicadLegacyInterface):
     """
     KiCAD footprint property tag object, consisting of a key value pair
@@ -72,21 +97,21 @@ class Footprint(KicadLegacyInterface):
     KiCAD footprint main object
     """
 
-    def __init__(self, name: str, coil: CoilInterface):
+    def __init__(self, config: FootprintConfig, coil: CoilInterface):
         """
         Generate a footprint object representing a coil
-        :param name: Name of the coil displayed as parameter
+        :param config: Footprint configuration parameters
         :param coil: Actual coil to generate on PCB
         """
-        self.name = name
+        self.config = config
         self.coil = coil
 
     def to_legacy_api_string(self) -> str:
         p1 = FootprintProperty(Point(0.0, 0.0), Layer("F.SilkS", False), "Reference", "REF**")
-        p2 = FootprintProperty(Point(0.0, 1.5), Layer("F.Fab", False), "Value", self.name)
+        p2 = FootprintProperty(Point(0.0, 1.5), Layer("F.Fab", False), "Value", self.config.get_name())
         p3 = FootprintProperty(Point(0.0, 0.0), Layer("F.Fab", False), "user", r"${REFERENCE}")
         return f"""
-        (footprint "{self.name}" (version 20211014) (generator kicad_coil_generator_plugin)
+        (footprint "{self.config.get_name()}" (version 20211014) (generator kicad_coil_generator_plugin)
         	(layer "F.Cu")
         	(attr smd)
             {p1.to_legacy_api_string()}

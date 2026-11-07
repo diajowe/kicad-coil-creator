@@ -58,7 +58,7 @@ class ViaRingCount:
         """
         Calculates number of vias required on each via ring
         :param common_coil_config: Common coil parameter settings, to extract layer count
-        :return: Correlation of how many vias per ring
+        :returns: Correlation of how many vias per ring
         :rtype: ViaRingCount
         """
         # coils with uneven layer count need one extra via
@@ -99,7 +99,7 @@ class ViaRingRadius:
         :param common_coil_config: Parameters all types of coil share
         :param trace_config: Parameters of a trace
         :param connecting_via_config: Configuration for connecting vias
-        :return: Calculated rings to place connecting vias on
+        :returns: Calculated rings to place connecting vias on
         :rtype: ViaRingRadius
         """
         coil_outer_radius_mm = common_coil_config.coil_outer_diameter_mm / 2.0
@@ -233,4 +233,3 @@ class ViaRings(KicadLegacyInterface):
             out += f"{via.to_legacy_api_string()}\n"
 
         return out
-
