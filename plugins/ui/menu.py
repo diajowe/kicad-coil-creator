@@ -54,8 +54,8 @@ class CoilGeneratorUI(wx.Frame):
         self.SetSizer(main_sizer)
 
         self.Bind(wx.EVT_SHOW, self.__sync_config_column_start_width)
-        self.Bind(wx.EVT_BUTTON, self.__generate_callback)
-        self.Bind(wx.EVT_BUTTON, self.__save_footprint_callback)
+        self.button_generate.Bind(wx.EVT_BUTTON, self.__generate_callback)
+        self.button_save_footprint.Bind(wx.EVT_BUTTON, self.__save_footprint_callback)
 
         self.Fit()
 
