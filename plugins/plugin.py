@@ -15,7 +15,6 @@ from .generator.helper_classes import Layer
 
 from .generator.footprint_objects.trace import TraceConfig
 from .generator.footprint_objects.via import ViaDiameterConfig
-from . import menu
 from .generator import generate
 
 from .ui.common_coil_config_panel import CommonCoilConfigPanel
