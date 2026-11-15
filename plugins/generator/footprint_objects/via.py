@@ -26,8 +26,10 @@ from typing import Self
 from enum import Enum
 
 from ..exceptions import CoilGenException, InvalidLengthException
-from ..helper_classes import Layer, Point, Uuid
+from ..helper_classes import ConfigValueRange, I32_MAX, KICAD_MIN_NOT_NULL,\
+    Layer, Point, Uuid
 from ..legacy_kicad_interface import KicadLegacyInterface
+
 
 class PadType(Enum):
     """
@@ -38,6 +40,7 @@ class PadType(Enum):
     SMD = "smd"
     CONNECT = "connect"
     NP_THRU_HOLE = "np_thru_hole"
+
 
 class PadShape(Enum):
     """
@@ -66,12 +69,14 @@ class ViaException(CoilGenException):
     (see this library's Via class)
     """
 
+
 class DiameterMismatchException(ViaException):
     """
     Custom exception being raised when generating a via,
     and the given drill diameter is >= the via's outer diameter.
     This would, when manufactured, drill the via away
     """
+
     def __init__(self, outer_diameter_mm: float, drill_diameter_mm: float):
         """
         Generates the exception
@@ -87,7 +92,7 @@ class ViaDiameterConfig:
     Groups together diameter configuration parameters of vias
     """
 
-    def __init__(self,outer_diameter_mm: float, drill_diameter_mm: float):
+    def __init__(self, outer_diameter_mm: float, drill_diameter_mm: float):
         """
         Defines via diameter parameters
         :param outer_diameter_mm: Diameter in mm of entire via. Has to be > drill_diameter_mm
@@ -98,10 +103,40 @@ class ViaDiameterConfig:
         if drill_diameter_mm <= 0 or outer_diameter_mm <= 0:
             raise InvalidLengthException(drill_diameter_mm)
         if outer_diameter_mm <= drill_diameter_mm:
-            raise DiameterMismatchException(outer_diameter_mm, drill_diameter_mm)
+            raise DiameterMismatchException(
+                outer_diameter_mm, drill_diameter_mm)
 
         self.outer_diameter_mm = outer_diameter_mm
         self.drill_diameter_mm = drill_diameter_mm
+
+    @classmethod
+    def get_outer_diameter_range(cls) -> ConfigValueRange:
+        """
+        Returns the value range of the via outer diameter config value
+        """
+        return ConfigValueRange(KICAD_MIN_NOT_NULL, float(I32_MAX))
+
+    @classmethod
+    def get_drill_diameter_range(cls) -> ConfigValueRange:
+        """
+        Returns the value range of the via drill diameter config value
+        """
+        return ConfigValueRange(KICAD_MIN_NOT_NULL, I32_MAX)
+
+    @classmethod
+    def get_outer_diameter_default(cls) -> float:
+        """
+        Returns the default value of the via outer diameter config value
+        """
+        return KICAD_MIN_NOT_NULL * 2
+
+    @classmethod
+    def get_drill_diameter_default(cls) -> float:
+        """
+        Returns the default value of the via drill diameter config value
+        """
+        return KICAD_MIN_NOT_NULL
+
 
 class ViaConfig:
     """
@@ -197,6 +232,7 @@ class Via(KicadLegacyInterface):
     	)
         """
 
+
 class SolderPad(KicadLegacyInterface):
     """
     KiCAD footprint solder pad object
@@ -207,7 +243,7 @@ class SolderPad(KicadLegacyInterface):
         position: Point,
         pad_config: PadConfig,
         layer: Layer
-        ):
+    ):
         """
         Generate a solder pad at a position
         :param position: Center position of the solder pad

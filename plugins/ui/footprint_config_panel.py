@@ -24,6 +24,7 @@ This allows the usage as WX element and helps building the coil generator's UI.
 # todo: document
 
 import wx
+
 from wx import Window
 
 from .config_panel import ButtonInputConnector, ConfigPanel, ConfigButton, ConfigButtonRow
@@ -39,12 +40,16 @@ class FootprintConfigPanel(ConfigPanel):
     )
     DEFAULT_COIL_NAME: str = "COIL_DEFAULT"
     BUTTON_TOOLTIP: str = "Generate a default footprint name"
+    NAME_ID: str = "footprint_name"
 
     def __init__(self, parent: Window):
+        # if editing anything regarding the input objects,
+        # also change restore_from_saved and get_current_displayed_config
         super().__init__(
             parent,
             [
                 ConfigButtonRow(
+                    self.NAME_ID,
                     self.NAME_LABEL_NAME,
                     StringInput(tooltip=self.NAME_TOOLTIP),
                     ConfigButton(
@@ -58,7 +63,6 @@ class FootprintConfigPanel(ConfigPanel):
         )
 
     def __restore_default_name(self, event: wx.Event, connector: ButtonInputConnector):
-        # todo: all event callbacks need to be wrapped in a function that catches and logs exceptions
         # continue processing event after this handler finishes
         event.Skip()
 

@@ -1,11 +1,10 @@
 {
-    "turn_direction": 1,
-    "layer_count": 28,
-    "name": "blubb",
-    "turns_count": "10",
-    "outer_diameter": "12",
-    "trace_width": "0.100",
-    "trace_spacing": "0.200",
-    "via_outer": "0.6",
-    "via_drill": "0.3"
+    "footprint_name": "COIL_DEFAULT",
+    "coil_outer_diameter_mm": 10.68,
+    "coil_rotation_direction": 1,
+    "coil_turns_per_layer": 1,
+    "trace_width_mm": 0.01,
+    "trace_spacing_mm": 0.01,
+    "via_outer_diameter_mm": 0.02,
+    "via_drill_diameter_mm": 0.01
 }

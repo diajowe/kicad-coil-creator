@@ -25,9 +25,10 @@ This allows the usage as WX element and helps building the coil generator's UI.
 
 from wx import Window
 
-from .config_panel import ConfigPanel, ConfigUnitRow
 from .config_input import FloatInput
+from .config_panel import ConfigPanel, ConfigUnitRow
 
+from ..generator.footprint_objects.trace import TraceConfig
 
 class TraceConfigPanel(ConfigPanel):
     SECTION_TITLE: str = "Trace Configuration"
@@ -37,15 +38,31 @@ class TraceConfigPanel(ConfigPanel):
     TRACE_WIDTH_TOOLTIP: str = \
         "Width of the drawn trace that is constitutes parts of the generated coil"
     TRACE_SPACING_TOOLTIP: str = "Gap between traces of coil sprials on one layer"
+    TRACE_WIDTH_ID: str = "trace_width_mm"
+    TRACE_SPACING_ID: str = "trace_spacing_mm"
 
     def __init__(self, parent: Window):
+        # if editing anything regarding the input objects,
+        # also change restore_from_saved and get_current_displayed_config
         super().__init__(
             parent,
             [
-                ConfigUnitRow(self.TRACE_WIDTH_LABEL_NAME,
-                          FloatInput(tooltip=self.TRACE_WIDTH_TOOLTIP), self.TRACE_UNIT_NAME),
-                ConfigUnitRow(self.TRACE_SPACING_LABEL_NAME,
-                          FloatInput(tooltip=self.TRACE_SPACING_TOOLTIP), self.TRACE_UNIT_NAME),
+                ConfigUnitRow(self.TRACE_WIDTH_ID, self.TRACE_WIDTH_LABEL_NAME,
+                    FloatInput(
+                        TraceConfig.get_width_range(),
+                        TraceConfig.get_width_default(),
+                        self.TRACE_WIDTH_TOOLTIP
+                        ),
+                    self.TRACE_UNIT_NAME
+                    ),
+                ConfigUnitRow(self.TRACE_SPACING_ID, self.TRACE_SPACING_LABEL_NAME,
+                    FloatInput(
+                        TraceConfig.get_spacing_range(),
+                        TraceConfig.get_spacing_default(),
+                        self.TRACE_SPACING_TOOLTIP
+                        ),
+                    self.TRACE_UNIT_NAME
+                    ),
             ],
             self.SECTION_TITLE
         )

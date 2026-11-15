@@ -23,6 +23,7 @@ See https://dev-docs.kicad.org/en/file-formats/sexpr-intro/index.html
 
 from enum import Enum
 
+from ..helper_classes import ConfigValueRange, I32_MAX, KICAD_MIN_NOT_NULL
 from ..exceptions import InvalidLengthException
 from ..legacy_kicad_interface import KicadLegacyInterface
 
@@ -82,9 +83,37 @@ class TraceConfig:
         self.trace_width_mm = trace_width_mm
         self.trace_spacing_mm = trace_spacing_mm
 
+    @classmethod
+    def get_spacing_range(cls) -> ConfigValueRange:
+        """
+        Returns the value range of the trace spacing config value
+        """
+        return ConfigValueRange(KICAD_MIN_NOT_NULL, float(I32_MAX))
+
+    @classmethod
+    def get_width_range(cls) -> ConfigValueRange:
+        """
+        Returns the value range of the trace width config value
+        """
+        return ConfigValueRange(KICAD_MIN_NOT_NULL, I32_MAX)
+
+    @classmethod
+    def get_spacing_default(cls) -> float:
+        """
+        Returns the default value of the trace spacing config value
+        """
+        return KICAD_MIN_NOT_NULL
+
+    @classmethod
+    def get_width_default(cls) -> float:
+        """
+        Returns the default value of the trace width config value
+        """
+        return KICAD_MIN_NOT_NULL
+
     def get_trace_increment(self) -> float:
         """
-        Returns the desirec complete increment between center points of traces
+        Returns the desired complete increment between center points of traces
         :returns: Center point distance between two traces
         :rtype: float
         """

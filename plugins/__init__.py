@@ -3,20 +3,19 @@ import os
 import logging
 import traceback
 
+from .persistent import get_log_file_path
+
 def init_logger():
     root = logging.getLogger()
     root.handlers.clear()
     root.setLevel(logging.DEBUG)
 
-    log_file = os.path.join(os.path.dirname(
-        __file__), "dynamic/coilgenerator.log")
-
-    handler = logging.FileHandler(log_file)
+    handler = logging.FileHandler(get_log_file_path())
     handler.setLevel(logging.DEBUG)
 
 
     formatter = logging.Formatter(
-        "%(asctime)s %(name)s %(lineno)d:%(message)s", datefmt="%m-%d %H:%M:%S"
+        "%(asctime)s - %(levelname)s - %(filename)s:%(lineno)d -> %(message)s", datefmt="%m-%d %H:%M:%S"
     )
     handler.setFormatter(formatter)
     root.addHandler(handler)
@@ -28,6 +27,8 @@ try:
     from .plugin import Plugin
     plugin = Plugin()
     plugin.register()
+    
+    
 except Exception as e:
     logger = logging.getLogger()
     logger.debug(repr(e))

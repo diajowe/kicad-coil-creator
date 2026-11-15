@@ -25,13 +25,33 @@ footprints that do not directly translate to footprint contents
 
 from enum import Enum
 from math import atan2, cos, degrees, radians, sin, sqrt
-from typing import Self
+from typing import Any,Self
 from uuid import uuid4
 
 from .exceptions import CoilGenException
 from .legacy_kicad_interface import KicadLegacyInterface
 
 # todo: go through anything that raises and make sure that everyhting that uses a function that raises has proper annotation
+
+
+# Used as a shorthand to get the maximum integer value displayable by unsigned 32 bit integer
+I32_MAX = (1 << 31) - 1
+# this is used as the minimum value for configuration objects that should be bigger than 0
+KICAD_MIN_NOT_NULL = 0.01
+
+class ConfigValueRange:
+    """
+    Stores minimum and maximum value range for configuration values
+    """
+    def __init__(self, minimum: Any, maximum: Any):
+        """
+        Generates object to store inclusive minimum and maximum values for a configuration object
+        WARNING: does not check if minimum < maximum
+        :param minimum: Lower value range end of configuration parameter
+        :param maximum: Higher value range end of configuration parameter
+        """
+        self.minimum = minimum
+        self.maximum = maximum
 
 class Orientation2D(Enum):
     """

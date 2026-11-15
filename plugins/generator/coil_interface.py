@@ -23,8 +23,11 @@ by providing a single interface for all types of coils
 
 from abc import ABC, abstractmethod
 
+import pcbnew
+
 from .exceptions import InvalidLengthException
-from .helper_classes import Layer, RotationDirection
+from .helper_classes import ConfigValueRange, I32_MAX, KICAD_MIN_NOT_NULL, \
+    Layer, RotationDirection
 from .legacy_kicad_interface import KicadLegacyInterface
 from .footprint_objects.trace import TraceConfig
 from .footprint_objects.via import ViaDiameterConfig
@@ -62,6 +65,56 @@ class CommonCoilConfig:
         self.rotation_direction = rotation_direction
         self.coil_layers = coil_layers
         self.turns_per_layer = turns_per_layer
+
+    @classmethod
+    def get_outer_diam_range(cls) -> ConfigValueRange:
+        """
+        Returns the value range of the outer coil diameter config value
+        """
+
+        return ConfigValueRange(KICAD_MIN_NOT_NULL, float(I32_MAX))
+
+    @classmethod
+    def get_turns_per_layer_range(cls) -> ConfigValueRange:
+        """
+        Returns the value range of the number of coil loops per layer config value
+        """
+        return ConfigValueRange(1, I32_MAX)
+
+    @classmethod
+    def get_num_layers_range(cls) -> ConfigValueRange:
+        """
+        Returns the value range of the number of coil layers config value
+        """
+        return ConfigValueRange(1, pcbnew.GetBoard().GetCopperLayerCount() + 1)
+
+    @classmethod
+    def get_outer_diam_default(cls) -> float:
+        """
+        Returns the default value of the outer coil diameter config value
+        """
+        return 10.0
+
+    @classmethod
+    def get_turns_per_layer_default(cls) -> int :
+        """
+        Returns the default value of the number of coil loops per layer config value
+        """
+        return 5
+
+    @classmethod
+    def get_num_layers_default(cls) -> int:
+        """
+        Returns the default value of the number of coil layers config value
+        """
+        return 1
+
+    @classmethod
+    def get_rotation_direction_default(cls) -> RotationDirection:
+        """
+        Returns the default value for the coil rotation direction config value
+        """
+        return RotationDirection.CLOCKWISE
 
     def get_layer_count(self) -> int:
         """

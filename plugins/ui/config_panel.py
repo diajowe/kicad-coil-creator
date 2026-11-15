@@ -2,32 +2,40 @@
 
 
 from abc import ABC, abstractmethod
-from typing import Callable, override, Union
+from typing import Any, Callable, override, Union
 
 import wx
 
 from wx import BitmapButton, BoxSizer, Control, FlexGridSizer, StaticText, Window
-from .config_input import ConfigInputInterface
-from .helper import get_default_obj_spacing
+from .config_input import ConfigInputInterface, ControlAccessor
+from .config_loader import ConfigDisplay
+from .helper import callback_logging_wrapper, get_default_obj_spacing
+
 
 class ConfigRow(ABC):
+    def __init__(self, identifier: str):
+        self._identifier = identifier
+
+    def get_identifier(self) -> str:
+        return self._identifier
+
     @abstractmethod
     def generate_name_label(self, parent: Window) -> StaticText:
         pass
 
     @abstractmethod
-    def generate_input_field(self, parent: Window) -> Control:
+    def generate_input_field(self, parent: Window) -> (Control, ControlAccessor):
         pass
 
     @abstractmethod
-    def generate_suffix_object(self, parent: Window) -> Union[StaticText,BitmapButton]:
+    def generate_suffix_object(self, parent: Window) -> Union[StaticText, BitmapButton]:
         pass
 
-# todo: this is not necessary if all ui elements get created at the same time
+
 class ButtonInputConnector:
     def __init__(self):
-        self.button: Union[None,BitmapButton] = None
-        self.input: Union[None,Control] = None
+        self.button: Union[None, BitmapButton] = None
+        self.input: Union[None, Control] = None
 
     def set_button(self, button: BitmapButton):
         self.button = button
@@ -35,9 +43,10 @@ class ButtonInputConnector:
     def set_input(self, input_field: Control):
         self.input = input_field
 
+
 class ConfigButton:
     # icon should be one of the wx.ART_xxx numbers
-    def __init__(self, icon: int, callback: Callable[[wx.Event,ButtonInputConnector],None], tooltip: Union[None,str] = None, ):
+    def __init__(self, icon: int, callback: Callable[[wx.Event, ButtonInputConnector], None], tooltip: Union[None, str] = None, ):
         self._icon = icon
         self._tooltip = tooltip
         self._callback = callback
@@ -53,11 +62,13 @@ class ConfigButton:
 
         return button
 
-    def get_callback_func(self) -> Callable[[wx.Event,ButtonInputConnector],None]:
+    def get_callback_func(self) -> Callable[[wx.Event, ButtonInputConnector], None]:
         return self._callback
 
+
 class ConfigButtonRow(ConfigRow):
-    def __init__(self,  name: str, input_field: ConfigInputInterface, button: ConfigButton):
+    def __init__(self, identifier: str,  name: str, input_field: ConfigInputInterface, button: ConfigButton):
+        super().__init__(identifier)
         self._name = name
         self._input_field = input_field
         self._button = button
@@ -69,15 +80,15 @@ class ConfigButtonRow(ConfigRow):
         return StaticText(parent, label=self._name)
 
     @override
-    def generate_input_field(self, parent: Window) -> Control:
-        control = self._input_field.generate_control(parent)
+    def generate_input_field(self, parent: Window) -> (Control, ControlAccessor):
+        (control, accessor) = self._input_field.generate_control(parent)
         self._button_input_connector.set_input(control)
-        return control
+        return (control, accessor)
 
     @override
-    def generate_suffix_object(self, parent: Window) -> Union[StaticText,BitmapButton]:
+    def generate_suffix_object(self, parent: Window) -> Union[StaticText, BitmapButton]:
         button = self._button.generate_button(parent)
-        button.Bind(wx.EVT_BUTTON, self.__button_callback)
+        button.Bind(wx.EVT_BUTTON, callback_logging_wrapper(self.__button_callback))
 
         self._button_input_connector.set_button(button)
         return button
@@ -89,7 +100,8 @@ class ConfigButtonRow(ConfigRow):
 
 
 class ConfigUnitRow(ConfigRow):
-    def __init__(self,  name: str, input_field: ConfigInputInterface, unit: Union[None,str]):
+    def __init__(self, identifier: str, name: str, input_field: ConfigInputInterface, unit: Union[None, str]):
+        super().__init__(identifier)
         self._name = name
         self._input_field = input_field
         self._unit = unit
@@ -99,15 +111,16 @@ class ConfigUnitRow(ConfigRow):
         return StaticText(parent, label=self._name)
 
     @override
-    def generate_input_field(self, parent: Window) -> Control:
+    def generate_input_field(self, parent: Window) -> (Control, ControlAccessor):
         return self._input_field.generate_control(parent)
 
     @override
-    def generate_suffix_object(self, parent: Window) -> Union[StaticText,BitmapButton]:
+    def generate_suffix_object(self, parent: Window) -> Union[StaticText, BitmapButton]:
         if self._unit is not None:
             return StaticText(parent, label=self._unit)
         else:
             return self._unit
+
 
 class ConfigGrid(wx.Panel):
 
@@ -120,10 +133,16 @@ class ConfigGrid(wx.Panel):
         self.grid_sizer = FlexGridSizer(3, spacing, spacing)
         wx_alignment = wx.EXPAND | wx.ALL | wx.ALIGN_CENTER_VERTICAL
 
+        self.id_field_mapping: dict[str, ControlAccessor] = {}
         for obj in self.config_objects:
-            self.grid_sizer.Add(obj.generate_name_label(self), 0, wx_alignment, 0)
-            self.grid_sizer.Add(obj.generate_input_field(self), 0, wx_alignment, 0)
-            self.grid_sizer.Add(obj.generate_suffix_object(self), 0, wx_alignment, 0)
+            (current_input_field, accessor) = obj.generate_input_field(self)
+            self.id_field_mapping[obj.get_identifier()] = accessor
+            self.grid_sizer.Add(
+                obj.generate_name_label(self), 0, wx_alignment, 0)
+            self.grid_sizer.Add(
+                current_input_field, 0, wx_alignment, 0)
+            self.grid_sizer.Add(
+                obj.generate_suffix_object(self), 0, wx_alignment, 0)
 
         self.SetSizer(self.grid_sizer)
         self.Fit()
@@ -134,7 +153,7 @@ class ConfigGrid(wx.Panel):
         sizer_items = self.grid_sizer.GetChildren()
 
         for row in range(0, len(sizer_items) // 3):
-            for column in range(0,3):
+            for column in range(0, 3):
                 item_num = row * 3 + column
                 element = sizer_items[item_num]
 
@@ -146,13 +165,17 @@ class ConfigGrid(wx.Panel):
     def set_min_column_width(self, min_width: (int, int, int)):
         sizer_items = self.grid_sizer.GetChildren()
         for row in range(0, len(sizer_items) // 3):
-            for column in range(0,3):
+            for column in range(0, 3):
                 item_num = row * 3 + column
                 current_height = sizer_items[item_num].GetSize().GetHeight()
-                sizer_items[item_num].SetMinSize(wx.Size(min_width[column], current_height))
+                sizer_items[item_num].SetMinSize(
+                    wx.Size(min_width[column], current_height))
+
+    def get_id_field_mapping(self) -> dict[str, ControlAccessor]:
+        return self.id_field_mapping
 
 
-class ConfigPanel(wx.Panel):
+class ConfigPanel(ConfigDisplay):
     def __init__(self, parent: wx.Window, config_objects: list[ConfigRow], title: str):
         super().__init__(parent)
 
@@ -164,7 +187,8 @@ class ConfigPanel(wx.Panel):
         box_sizer = BoxSizer(wx.VERTICAL)
         box_sizer.Add(title, 0, wx.TOP | wx.BOTTOM, get_default_obj_spacing())
         self.config_grid = ConfigGrid(self, config_objects)
-        box_sizer.Add(self.config_grid, 0, wx.TOP | wx.BOTTOM, get_default_obj_spacing())
+        box_sizer.Add(self.config_grid, 0, wx.TOP |
+                      wx.BOTTOM, get_default_obj_spacing())
         self.SetSizer(box_sizer)
 
     def get_current_min_row_width(self) -> (int, int, int):
@@ -172,3 +196,21 @@ class ConfigPanel(wx.Panel):
 
     def set_min_column_width(self, min_width: (int, int, int)):
         self.config_grid.set_min_column_width(min_width)
+
+
+    @override
+    def restore_from_saved(self, config_objects: dict[str,Any]):
+
+        for config_id, accessor in self.config_grid.get_id_field_mapping().items():
+            # todo: need to set back to hardcoded default explicitly if setting not found
+            if config_objects.get(config_id) is not None:
+                accessor.set_value(config_objects.get(config_id))
+
+    @override
+    def get_current_displayed_config(self) -> dict[str,Any]:
+        output: dict[str,Any] = {}
+
+        for config_id, accessor in self.config_grid.get_id_field_mapping().items():
+            output[config_id] = accessor.get_value()
+        
+        return output

@@ -2,11 +2,11 @@
 import wx
 
 from .common_coil_config_panel import CommonCoilConfigPanel
+from .config_loader import ConfigLoader
 from .footprint_config_panel import FootprintConfigPanel
-from .helper import get_default_obj_spacing
+from .helper import callback_logging_wrapper, get_default_obj_spacing
 from .trace_config_panel import TraceConfigPanel
 from .via_diameter_config_panel import ViaDiameterConfigPanel
-
 
 class CoilGeneratorUI(wx.Frame):
     WINDOW_TITLE: str = "Coil Generator"
@@ -23,12 +23,20 @@ class CoilGeneratorUI(wx.Frame):
         style = wx.DEFAULT_FRAME_STYLE & ~(wx.RESIZE_BORDER | wx.MAXIMIZE_BOX)
         super().__init__(parent, title=self.WINDOW_TITLE, style=style)
 
+        self.config_loader = ConfigLoader()
+
         # generating config panels
         footprint_config = FootprintConfigPanel(self)
         common_config = CommonCoilConfigPanel(self)
         trace_config = TraceConfigPanel(self)
         via_diameter_config = ViaDiameterConfigPanel(self)
         self.config_panels = [footprint_config, common_config, trace_config, via_diameter_config]
+
+        # add config displaying objects to config load / store mechanism
+        for panel in self.config_panels:
+            self.config_loader.add_config_display(panel)
+
+        self.config_loader.load_saved_config()
 
         # generating buttons
         self.button_generate = wx.Button(
@@ -53,9 +61,9 @@ class CoilGeneratorUI(wx.Frame):
         main_sizer.Add(button_bar_sizer, 0, wx.EXPAND | wx.ALL, 0)
         self.SetSizer(main_sizer)
 
-        self.Bind(wx.EVT_SHOW, self.__sync_config_column_start_width)
-        self.button_generate.Bind(wx.EVT_BUTTON, self.__generate_callback)
-        self.button_save_footprint.Bind(wx.EVT_BUTTON, self.__save_footprint_callback)
+        self.Bind(wx.EVT_SHOW, callback_logging_wrapper(self.__sync_config_column_start_width))
+        self.button_generate.Bind(wx.EVT_BUTTON, callback_logging_wrapper(self.__generate_callback))
+        self.button_save_footprint.Bind(wx.EVT_BUTTON, callback_logging_wrapper(self.__save_footprint_callback))
 
         self.Fit()
 
@@ -89,7 +97,8 @@ class CoilGeneratorUI(wx.Frame):
 
         # only processing button press events
         if event.GetEventType() == wx.wxEVT_BUTTON:
-            # close window
+            # save settings and close window
+            self.config_loader.save_current_config()
             self.Destroy()
 
             # todo: generate coil
@@ -100,7 +109,8 @@ class CoilGeneratorUI(wx.Frame):
 
         # only processing button press events
         if event.GetEventType() == wx.wxEVT_BUTTON:
-            # close window
+            # save settings and close window
+            self.config_loader.save_current_config()
             self.Destroy()
 
             # todo: save footprint

@@ -23,6 +23,7 @@ from .ui.common_coil_config_panel import CommonCoilConfigPanel
 
 from .generator.helper_classes import Layer, RotationDirection
 from .ui.menu import CoilGeneratorUI
+
 # todo: we generate up to one full turn to get to the next vias, as loops always start on the x axis
 
 #class CoilGeneratorUI(wx.Frame):

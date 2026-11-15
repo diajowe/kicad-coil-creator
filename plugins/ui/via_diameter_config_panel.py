@@ -25,9 +25,10 @@ This allows the usage as WX element and helps building the coil generator's UI.
 
 from wx import Window
 
-from .config_panel import ConfigPanel, ConfigUnitRow
 from .config_input import FloatInput
+from .config_panel import ConfigPanel, ConfigUnitRow
 
+from ..generator.footprint_objects.via import ViaDiameterConfig
 
 class ViaDiameterConfigPanel(ConfigPanel):
     SECTION_TITLE: str = "Via Diameter Configuration"
@@ -43,14 +44,31 @@ class ViaDiameterConfigPanel(ConfigPanel):
         "Must be smaller than outer diameter, or else the drill bit would destroy the via ring"
     )
 
+    VIA_OUTER_DIAM_ID: str = "via_outer_diameter_mm"
+    VIA_DRILL_DIAM_ID: str = "via_drill_diameter_mm"
+
     def __init__(self, parent: Window):
+        # if editing anything regarding the input objects,
+        # also change restore_from_saved and get_current_displayed_config
         super().__init__(
             parent,
             [
-                ConfigUnitRow(self.VIA_OUTER_DIAMETER_LABEL_NAME,
-                          FloatInput(tooltip=self.VIA_OUTER_DIAMETER_TOOLTIP), self.VIA_UNIT_NAME),
-                ConfigUnitRow(self.VIA_DRILL_DIAMETER_LABEL_NAME, FloatInput(
-                    tooltip=self.VIA_DRILL_DIAMETER_TOOLTIP), self.VIA_UNIT_NAME),
+                ConfigUnitRow(self.VIA_OUTER_DIAM_ID, self.VIA_OUTER_DIAMETER_LABEL_NAME,
+                    FloatInput(
+                        ViaDiameterConfig.get_outer_diameter_range(),
+                        ViaDiameterConfig.get_outer_diameter_default(),
+                        self.VIA_OUTER_DIAMETER_TOOLTIP
+                        ),
+                    self.VIA_UNIT_NAME
+                    ),
+                ConfigUnitRow(self.VIA_DRILL_DIAM_ID, self.VIA_DRILL_DIAMETER_LABEL_NAME,
+                    FloatInput(
+                        ViaDiameterConfig.get_drill_diameter_range(),
+                        ViaDiameterConfig.get_drill_diameter_default(),
+                        self.VIA_DRILL_DIAMETER_TOOLTIP
+                        ),
+                    self.VIA_UNIT_NAME
+                    ),
             ],
             self.SECTION_TITLE
         )

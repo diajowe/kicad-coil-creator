@@ -28,6 +28,7 @@ from wx import Window
 from .config_panel import ConfigPanel, ConfigUnitRow
 from .config_input import IntInput, FloatInput, RotationDirectionInput
 
+from ..generator.coil_interface import CommonCoilConfig
 
 class CommonCoilConfigPanel(ConfigPanel):
     SECTION_TITLE: str = "Common Coil Configuration"
@@ -49,18 +50,40 @@ class CommonCoilConfigPanel(ConfigPanel):
         "There may be up to a fraction of a turn more per layer, "
         "which may sum up to multiple more coil trace spirals in the finished coil"
     )
+    OUTER_DIAM_ID="coil_outer_diameter_mm"
+    ROTATION_DIRECTION_ID="coil_rotation_direction"
+    TURNS_PER_LAYER_ID="coil_turns_per_layer"
 
     # todo: add coil layer selection
     def __init__(self, parent: Window):
+        # if editing anything regarding the input objects,
+        # also change restore_from_saved and get_current_displayed_config
         super().__init__(
             parent,
             [
-                ConfigUnitRow(self.OUTER_DIAM_LABEL_NAME, FloatInput(
-                    tooltip=self.OUTER_DIAM_TOOLTIP), self.OUTER_DIAM_UNIT_NAME),
-                ConfigUnitRow(self.ROTATION_DIRECTION_LABEL_NAME,
-                          RotationDirectionInput(tooltip=self.ROTATION_DIRECTION_TOOLTIP), None),
-                ConfigUnitRow(self.TURNS_PER_LAYER_LABEL_NAME, IntInput(
-                    tooltip=self.TURNS_PER_LAYER_TOOLTIP), None)
+                ConfigUnitRow(self.OUTER_DIAM_ID, self.OUTER_DIAM_LABEL_NAME, 
+                    FloatInput(
+                        CommonCoilConfig.get_outer_diam_range(),
+                        CommonCoilConfig.get_outer_diam_default(),
+                        self.OUTER_DIAM_TOOLTIP
+                        ),
+                    self.OUTER_DIAM_UNIT_NAME
+                    ),
+                ConfigUnitRow(self.ROTATION_DIRECTION_ID, self.ROTATION_DIRECTION_LABEL_NAME,
+                    RotationDirectionInput(
+                        CommonCoilConfig.get_rotation_direction_default(),
+                        tooltip=self.ROTATION_DIRECTION_TOOLTIP
+                        ),
+                    None
+                    ),
+                ConfigUnitRow(self.TURNS_PER_LAYER_ID, self.TURNS_PER_LAYER_LABEL_NAME,
+                    IntInput(
+                        CommonCoilConfig.get_turns_per_layer_range(),
+                        CommonCoilConfig.get_turns_per_layer_default(),
+                        self.TURNS_PER_LAYER_TOOLTIP
+                        ),
+                    None
+                    )
             ],
             self.SECTION_TITLE
         )
